@@ -1,0 +1,92 @@
+[project]
+name = "llm-patch"
+version = "0.1.0"
+description = "Instant Knowledge Internalization — Convert documents into LoRA adapter weights using Text-to-LoRA hypernetworks"
+authors = [{ name = "llm-patch contributors" }]
+license = { text = "Apache-2.0" }
+readme = "README.md"
+requires-python = ">=3.11"
+keywords = ["lora", "hypernetwork", "llm", "fine-tuning", "adapters"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Typing :: Typed",
+]
+dependencies = [
+    "torch>=2.1",
+    "transformers>=4.40",
+    "peft>=0.12",
+    "safetensors>=0.4",
+    "pydantic>=2.0",
+    "watchdog>=4.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/seismael/llm-patch"
+Repository = "https://github.com/seismael/llm-patch"
+Documentation = "https://github.com/seismael/llm-patch#readme"
+Changelog = "https://github.com/seismael/llm-patch/blob/main/CHANGELOG.md"
+"Bug Tracker" = "https://github.com/seismael/llm-patch/issues"
+
+[project.optional-dependencies]
+wiki = ["pyyaml"]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "pytest-mock",
+    "pytest-cov",
+    "mypy>=1.10",
+    "ruff>=0.5",
+    "pre-commit>=3.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/llm_patch"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM", "RUF"]
+ignore = ["E501"]
+
+[tool.ruff.lint.per-file-ignores]
+"examples/*.py" = ["E402"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["llm_patch"]
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_return_any = true
+warn_unused_configs = true
+# plugins = ["pydantic.mypy"]  # disabled: causes hang on this system
+
+[[tool.mypy.overrides]]
+module = [
+    "torch.*",
+    "safetensors.*",
+    "watchdog.*",
+    "hyper_llm_modulator.*",
+]
+ignore_missing_imports = true
+follow_imports = "skip"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--strict-markers -v --basetemp=.pytest_tmp"
+markers = [
+    "integration: marks tests as integration tests (deselect with '-m \"not integration\"')",
+]
