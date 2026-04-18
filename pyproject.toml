@@ -31,12 +31,34 @@ Changelog = "https://github.com/seismael/llm-patch/blob/main/CHANGELOG.md"
 
 [project.optional-dependencies]
 wiki = ["pyyaml"]
+cli = ["click>=8.0"]
+mcp = ["mcp>=1.0"]
+llm = ["litellm>=1.0"]
+anthropic = ["anthropic>=0.40"]
+pdf = ["pypdf>=4.0"]
+http = ["httpx>=0.24"]
+server = ["fastapi>=0.100", "uvicorn>=0.20"]
+all = [
+    "pyyaml",
+    "click>=8.0",
+    "mcp>=1.0",
+    "litellm>=1.0",
+    "anthropic>=0.40",
+    "pypdf>=4.0",
+    "httpx>=0.24",
+    "fastapi>=0.100",
+    "uvicorn>=0.20",
+]
+
+[project.scripts]
+llm-patch = "llm_patch.cli:main"
 
 [dependency-groups]
 dev = [
     "pytest>=8.0",
     "pytest-mock",
     "pytest-cov",
+    "httpx>=0.24",
     "mypy>=1.10",
     "ruff>=0.5",
     "pre-commit>=3.0",

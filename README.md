@@ -2,9 +2,9 @@
 
 # llm-patch
 
-**Instant Knowledge Internalization for Large Language Models**
+**Generic Ingest → Compile → Attach → Use Framework for LLMs**
 
-*Turn any text document into LoRA adapter weights in a single forward pass — no fine-tuning, no retraining, no waiting.*
+*Turn any text source into LoRA adapter weights, attach them to any HuggingFace model, and serve the patched model for inference.*
 
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-≥3.11-blue.svg)](https://www.python.org/)
@@ -15,18 +15,20 @@
 
 ---
 
-`llm-patch` converts text documents into [LoRA](https://arxiv.org/abs/2106.09685) adapter weights using [Sakana AI's Text-to-LoRA](https://github.com/SakanaAI/text-to-lora) hypernetworks. Point it at a directory of Markdown files — API docs, research papers, wiki pages, internal knowledge bases — and it produces small, composable adapter weights (~2–5 MB each) that can be dynamically loaded into any compatible LLM at inference time.
+`llm-patch` is a pluggable framework for converting text documents from **any source** (Markdown, Wiki, PDF, JSONL, HTTP APIs) into [LoRA](https://arxiv.org/abs/2106.09685) adapter weights, attaching them to HuggingFace models, and serving the patched model via CLI or HTTP API. The default weight generation backend uses [Sakana AI's Text-to-LoRA](https://github.com/SakanaAI/text-to-lora) hypernetworks for single-pass adapter generation.
 
 The result: **your language model learns new knowledge instantly**, without gradient-based training, GPU hours, or model redeployment.
 
 ### Highlights
 
 - **Zero fine-tuning** — A single forward pass through a hypernetwork synthesizes LoRA weights from text embeddings. No training loop, no optimizer, no loss function.
-- **Real-time watch mode** — Monitor directories for document changes. New or updated files automatically trigger adapter generation within seconds.
-- **Composable knowledge** — Each document becomes an independent adapter. Load one, stack several, or swap them dynamically per request.
-- **Production-ready output** — Adapters are stored in the HuggingFace-standard `safetensors` format with PEFT-compatible configuration. Load them with one line of code.
-- **Pluggable architecture** — Swap sources, generators, and storage backends independently. Built on SOLID principles with clean interfaces.
-- **Wiki-aware ingestion** — First-class support for structured wiki directories with YAML frontmatter parsing, `[[wikilink]]` resolution, and cross-page content aggregation.
+- **Multi-source ingestion** — Markdown directories, wiki vaults, PDFs, JSONL files, HTTP APIs, or any custom `IDataSource` implementation. Compose multiple sources with `CompositeDataSource`.
+- **Full pipeline: Ingest → Compile → Attach → Use** — From raw documents to a running agent in one flow. Load base models, stack adapters, generate or chat.
+- **Real-time watch mode** — Monitor directories for changes. New or updated files automatically trigger adapter generation within seconds.
+- **Composable knowledge** — Each document becomes an independent adapter. Load one, stack several, merge them, or swap dynamically per request.
+- **HTTP API server** — FastAPI-based server for adapter management and model inference.
+- **CLI tooling** — `llm-patch source`, `llm-patch adapter`, `llm-patch model`, `llm-patch wiki`, `llm-patch serve`.
+- **Pluggable architecture** — Swap sources, generators, storage, model providers, and runtimes independently. Built on SOLID principles with clean ABC interfaces.
 
 ---
 
@@ -78,17 +80,24 @@ Large language models are powerful, but they're frozen at training time. When yo
 ## How It Works
 
 ```
-┌──────────────┐     ┌──────────────┐     ┌──────────────┐     ┌──────────────┐
-│  Documents   │────►│  Text        │────►│ Hypernetwork │────►│ LoRA Adapter │
-│  (Markdown)  │     │  Embedding   │     │ (T2L)        │     │  Weights     │
-└──────────────┘     └──────────────┘     └──────────────┘     └──────┬───────┘
-                                                                      │
-                                                                      ▼
-                                                               ┌──────────────┐
-                                                               │ Load into    │
-                                                               │ any LLM via  │
-                                                               │ PEFT         │
-                                                               └──────────────┘
+┌──────────────────┐     ┌──────────────┐     ┌──────────────┐     ┌──────────────┐
+│  IDataSource     │────►│  Text        │────►│ Hypernetwork │────►│ LoRA Adapter │
+│  (Markdown, Wiki,│     │  Embedding   │     │ (T2L)        │     │  Weights     │
+│   PDF, JSONL,    │     └──────────────┘     └──────────────┘     └──────┬───────┘
+│   HTTP API, ...) │                                                      │
+└──────────────────┘                                                      ▼
+                                                               ┌──────────────────┐
+                                                               │ IModelProvider   │
+                                                               │ + IAdapterLoader │
+                                                               │ → ModelHandle    │
+                                                               └────────┬─────────┘
+                                                                        │
+                                                                        ▼
+                                                               ┌──────────────────┐
+                                                               │ IAgentRuntime    │
+                                                               │ generate / chat  │
+                                                               │ / stream         │
+                                                               └──────────────────┘
 ```
 
 ### The Pipeline in Plain Language
@@ -113,65 +122,198 @@ Traditional fine-tuning adjusts model weights through iterative gradient descent
 
 llm-patch enables a fundamentally new pattern: **models that learn from documents in real-time**. Here are concrete scenarios where this capability transforms workflows:
 
-### 1. Self-Improving AI Agents
+### 1. LLM Wiki Knowledge Specialization
+
+The **[LLM Wiki](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f)** pattern (described by Andrej Karpathy) proposes using LLMs to build and maintain a persistent, structured wiki — a compounding knowledge base where every source you add is synthesized, cross-referenced, and interlinked by the LLM. LLM Wikis are emerging as a powerful alternative to RAG — instead of retrieving raw chunks at query time, the knowledge is already compiled, synthesized, and interlinked. llm-patch takes this a step further: **convert the entire accumulated wiki into LoRA adapter weights** and bake that knowledge directly into a local model like Gemma.
+
+The result: a locally-running LLM that is a **genuine domain expert** on everything in your wiki — your research, your notes, your curated knowledge — without consuming context window tokens and without requiring cloud APIs.
+
+> *A researcher maintains an LLM Wiki on machine learning over six months — hundreds of interlinked pages covering papers, concepts, entities, and evolving syntheses. llm-patch watches the wiki directory and generates adapters as pages are created and updated. The researcher loads the merged adapter into a local Gemma model that now has deep, weight-level understanding of the entire knowledge base — answering questions with the synthesized insight of hundreds of sources, not just retrieving fragments.*
+
+**Why this matters — LLM Wiki vs RAG vs llm-patch:**
+
+| | **RAG** | **LLM Wiki alone** | **LLM Wiki + llm-patch** |
+|---|---|---|---|
+| **Knowledge structure** | Raw chunks in vector DB | Synthesized, interlinked pages | Baked into model weights |
+| **Context window** | Consumed by retrieved chunks | Consumed by retrieved pages | Fully available for reasoning |
+| **Knowledge depth** | Shallow (reading fragments) | Medium (reading syntheses) | Deep (internalized in parameters) |
+| **Offline capability** | Needs vector DB infrastructure | Needs LLM + wiki access | Adapter loaded once, fully offline |
+| **Compounding** | No accumulation | Knowledge compounds over time | Compounded knowledge in weights |
+| **Scalability** | Degrades with retrieval noise | Degrades beyond context window | Adapters compress knowledge into ~2-5 MB |
+| **Privacy** | May hit cloud APIs | May hit cloud APIs | Fully local with models like Gemma |
+
+**How to set it up:**
+
+```python
+from llm_patch import (
+    KnowledgeFusionOrchestrator,
+    WikiKnowledgeSource,
+    SakanaT2LGenerator,
+    LocalSafetensorsRepository,
+    GeneratorConfig, StorageConfig, WatcherConfig,
+)
+
+# Point at your LLM Wiki directory (Obsidian vault, markdown wiki, etc.)
+source = WikiKnowledgeSource(
+    WatcherConfig(directory="./my-llm-wiki/wiki"),
+    aggregate=True,  # Follow [[wikilinks]] for cross-page synthesis
+)
+
+orchestrator = KnowledgeFusionOrchestrator(
+    source=source,
+    generator=SakanaT2LGenerator(GeneratorConfig(checkpoint_dir="./models/gemma_2b_t2l")),
+    repository=LocalSafetensorsRepository(StorageConfig(output_dir="./wiki_adapters")),
+)
+
+# Compile all existing wiki pages into adapters
+manifests = orchestrator.compile_all()
+
+# Then watch for ongoing wiki updates
+with orchestrator:
+    # As your LLM Wiki agent adds/updates pages, adapters regenerate automatically
+    ...
+```
+
+Then load the adapters into your local model:
+
+```python
+from peft import PeftModel
+from transformers import AutoModelForCausalLM
+
+# Load Gemma (or any supported model) with your wiki knowledge
+base = AutoModelForCausalLM.from_pretrained("google/gemma-2-2b-it")
+model = PeftModel.from_pretrained(base, "./wiki_adapters/merged")
+
+# Your local LLM is now an expert on your entire knowledge base
+```
+
+This bridges the gap between **knowledge curation** (what LLM Wiki does well — synthesizing, cross-referencing, maintaining) and **knowledge internalization** (what llm-patch does — converting that curated knowledge into model weights). Together, they create a fully local, continuously-improving, domain-expert LLM. See [docs/USAGE.md](docs/USAGE.md#llm-wiki-integration) for the complete integration guide.
+
+### 2. Self-Improving AI Agents
 
 AI agents that operate over a knowledge base (wiki, Confluence, Notion) can use llm-patch to **continuously internalize their own knowledge source**. As the knowledge base evolves — through the agent's own actions or human edits — new adapters are generated automatically. The agent's underlying LLM always reflects the latest state of knowledge without redeployment or retraining.
 
 > *An agent that writes wiki pages about customer issues can then load adapters generated from those very pages, becoming progressively smarter about the problem domain it documents.*
 
-### 2. Personal Research Assistant
+### 3. Personal Research Assistant
 
 Researchers and knowledge workers can point llm-patch at their local notes directory — Obsidian vaults, Markdown collections, Zettlekasten systems. As they read papers and take notes, adapters are generated in real-time, and their local LLM **absorbs what they're actively researching**. The model doesn't just retrieve your notes — it *internalizes* them.
 
 > *A machine learning researcher reading papers on diffusion models gets a local LLM that progressively develops deep understanding of the topic, going beyond what RAG can achieve with context-window stuffing.*
 
-### 3. Enterprise Support Agents
+### 4. Enterprise Support Agents
 
 Support teams maintain documentation per product version (API v1, v2, v3). llm-patch watches each version's wiki and generates **version-specific adapters**. When a customer asks a question, the support LLM dynamically loads the adapter matching their product version — delivering precise, version-accurate answers with zero cross-version hallucination.
 
 > *A SaaS company with 5 API versions maintains 5 wiki directories. llm-patch produces 5 adapters. The support chatbot loads the right one per customer, eliminating "that feature was removed in v3" errors entirely.*
 
-### 4. Living Documentation QA
+### 5. Living Documentation QA
 
 Engineering teams point llm-patch at their documentation repository. Every commit to the docs triggers adapter regeneration. Internal chatbots and developer tools always answer questions based on **the current state of documentation** — not a stale training snapshot from months ago.
 
 > *A platform team's internal "ask the docs" chatbot never gives outdated answers because its adapter is regenerated on every docs PR merge.*
 
-### 5. Education & Tutoring
+### 6. Education & Tutoring
 
 Course instructors convert their curriculum — lecture notes, textbooks, problem sets — into adapters. Students interact with an LLM tutor that has **deep, curriculum-specific knowledge** rather than generic training data. Different courses produce different adapters; students load the one matching their class.
 
 > *A university's "AI Teaching Assistant" loads the adapter for CS 301 when a student asks about database normalization, and switches to the CS 201 adapter for data structures questions.*
 
-### 6. Compliance & Legal
+### 7. Compliance & Legal
 
 Legal and compliance teams convert regulation documents, internal policies, and contractual language into adapters. The resulting LLM has the **exact text of policies baked into its weights** — not retrieved from a vector database where chunking and retrieval errors can cause critical misquotes.
 
 > *A compliance officer asks "what are our data retention requirements for EU customers?" and gets an answer grounded in the actual policy text, not a paraphrased retrieval result.*
 
-### 7. Multi-Tenant SaaS Knowledge
+### 8. Multi-Tenant SaaS Knowledge
 
 SaaS platforms where each customer has their own knowledge base can generate **per-tenant adapters**. One base model serves all tenants; the correct adapter is loaded dynamically per API request. This is dramatically more efficient than running separate fine-tuned models per tenant.
 
 > *A customer success platform with 200 enterprise clients maintains 200 knowledge bases. llm-patch generates 200 adapters (~1 GB total). One base model + dynamic adapter loading serves all clients.*
 
-### 8. CI/CD-Driven Model Updates
+### 9. CI/CD-Driven Model Updates
 
 Integrate llm-patch into your CI/CD pipeline. Every documentation commit triggers adapter regeneration as a pipeline step. The freshest adapters are deployed alongside your application code. **Your model's knowledge is as current as your last merged pull request.**
 
 > *A GitHub Action runs `llm-patch compile` on every push to `docs/`. The resulting adapters are uploaded to S3 and hot-loaded by the production inference server.*
 
-### 9. Competitive Intelligence
+### 10. Competitive Intelligence
 
 Product and strategy teams monitor competitor documentation, changelogs, and public knowledge bases. llm-patch watches these sources and generates adapters that keep an analysis LLM **perpetually current on the competitive landscape** — no manual re-ingestion or periodic retraining required.
 
 > *A product manager asks "what features did Competitor X release this quarter?" and gets answers grounded in the competitor's actual documentation, updated automatically as their docs change.*
 
-### 10. Domain-Specific Copilots
+### 11. Domain-Specific Copilots
 
 Build specialized coding assistants by feeding API documentation, framework guides, and internal libraries into llm-patch. The resulting adapters create an LLM copilot that **deeply understands your specific tech stack** — not just public training data, but your internal SDKs, your API conventions, your architecture decisions.
 
 > *A development team working with a proprietary internal framework gets a coding assistant that knows framework-specific patterns, avoiding the generic suggestions that public models provide.*
+
+### 11. LLM Wiki Knowledge Specialization
+
+The **[LLM Wiki](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f)** pattern (described by Andrej Karpathy) proposes using LLMs to build and maintain a persistent, structured wiki — a compounding knowledge base where every source you add is synthesized, cross-referenced, and interlinked by the LLM. llm-patch takes this a step further: instead of just *reading* the wiki at query time, you can **convert the entire accumulated wiki into LoRA adapter weights** and bake that knowledge directly into a local model like Gemma.
+
+The result: a locally-running LLM that is a **genuine domain expert** on everything in your wiki — your research, your notes, your curated knowledge — without consuming context window tokens and without requiring cloud APIs.
+
+> *A researcher maintains an LLM Wiki on machine learning over six months — hundreds of interlinked pages covering papers, concepts, entities, and evolving syntheses. llm-patch watches the wiki directory and generates adapters as pages are created and updated. The researcher loads the merged adapter into a local Gemma model that now has deep, weight-level understanding of the entire knowledge base — answering questions with the synthesized insight of hundreds of sources, not just retrieving fragments.*
+
+**Why this matters:**
+
+| | **LLM Wiki alone (RAG-style)** | **LLM Wiki + llm-patch** |
+|---|---|---|
+| **Knowledge retrieval** | Read wiki pages at query time | Knowledge baked into model weights |
+| **Context window** | Consumed by retrieved pages | Fully available for reasoning |
+| **Offline capability** | Needs LLM + wiki access per query | Adapter loaded once, runs offline |
+| **Reasoning depth** | Surface-level (reading at inference) | Deep (internalized in parameters) |
+| **Scalability** | Degrades as wiki grows beyond context | Adapters compress knowledge into ~2-5 MB |
+| **Privacy** | Wiki content may hit cloud APIs | Fully local with models like Gemma |
+
+**How to set it up:**
+
+```python
+from llm_patch import (
+    KnowledgeFusionOrchestrator,
+    WikiKnowledgeSource,
+    SakanaT2LGenerator,
+    LocalSafetensorsRepository,
+    GeneratorConfig, StorageConfig, WatcherConfig,
+)
+
+# Point at your LLM Wiki directory (Obsidian vault, markdown wiki, etc.)
+source = WikiKnowledgeSource(
+    WatcherConfig(directory="./my-llm-wiki/wiki"),
+    aggregate=True,  # Follow [[wikilinks]] for cross-page synthesis
+)
+
+orchestrator = KnowledgeFusionOrchestrator(
+    source=source,
+    generator=SakanaT2LGenerator(GeneratorConfig(checkpoint_dir="./models/gemma_2b_t2l")),
+    repository=LocalSafetensorsRepository(StorageConfig(output_dir="./wiki_adapters")),
+)
+
+# Compile all existing wiki pages into adapters
+manifests = orchestrator.compile_all()
+
+# Then watch for ongoing wiki updates
+with orchestrator:
+    # As your LLM Wiki agent adds/updates pages, adapters regenerate automatically
+    ...
+```
+
+Then load the adapters into your local model:
+
+```python
+from peft import PeftModel
+from transformers import AutoModelForCausalLM
+
+# Load Gemma (or any supported model) with your wiki knowledge
+base = AutoModelForCausalLM.from_pretrained("google/gemma-2-2b-it")
+model = PeftModel.from_pretrained(base, "./wiki_adapters/merged")
+
+# Your local LLM is now an expert on your entire knowledge base
+```
+
+This bridges the gap between **knowledge curation** (what LLM Wiki does well — synthesizing, cross-referencing, maintaining) and **knowledge internalization** (what llm-patch does — converting that curated knowledge into model weights). Together, they create a fully local, continuously-improving, domain-expert LLM.
 
 ---
 
@@ -269,19 +411,16 @@ uv sync
 
 ```python
 from llm_patch import (
-    KnowledgeFusionOrchestrator,
-    SakanaT2LGenerator,
-    LocalSafetensorsRepository,
-    MarkdownDirectoryWatcher,
+    CompilePipeline,
+    MarkdownDataSource,
     GeneratorConfig,
     StorageConfig,
-    WatcherConfig,
 )
+from llm_patch.generators.sakana_t2l import SakanaT2LGenerator
+from llm_patch.storage.local_safetensors import LocalSafetensorsRepository
 
-# 1. Configure components
-watcher = MarkdownDirectoryWatcher(
-    WatcherConfig(directory="./api_docs")
-)
+# 1. Set up the source, generator, and storage
+source = MarkdownDataSource(directory="./api_docs")
 generator = SakanaT2LGenerator(
     GeneratorConfig(checkpoint_dir="./models/gemma_2b_t2l")
 )
@@ -289,64 +428,90 @@ repository = LocalSafetensorsRepository(
     StorageConfig(output_dir="./compiled_adapters")
 )
 
-# 2. Create the orchestrator (auto-registers as observer)
-orchestrator = KnowledgeFusionOrchestrator(
-    source=watcher,
-    generator=generator,
-    repository=repository,
-)
-
-# 3. Compile all existing documents into adapters
-manifests = orchestrator.compile_all()
+# 2. Compile all documents into adapter weights
+pipeline = CompilePipeline(source=source, generator=generator, repository=repository)
+manifests = pipeline.compile_all()
 for m in manifests:
     print(f"  {m.adapter_id} → {m.storage_uri}")
-
-# 4. Watch for future changes (blocking via context manager)
-with orchestrator:
-    # New/modified .md files automatically trigger weight generation
-    ...
 ```
 
-### Loading Adapters at Inference
+### Loading and Using Adapters
 
 ```python
-from peft import PeftModel
-from transformers import AutoModelForCausalLM
+from llm_patch.pipelines import UsePipeline
+from llm_patch.attach import HFModelProvider, PeftAdapterLoader
+from llm_patch.runtime.agent import PeftAgentRuntime
+from llm_patch.runtime.session import ChatSession
 
-base_model = AutoModelForCausalLM.from_pretrained("google/gemma-2-2b-it")
-model = PeftModel.from_pretrained(base_model, "./compiled_adapters/api_v2")
+# Load model and attach all compiled adapters
+use = UsePipeline(
+    model_provider=HFModelProvider(),
+    adapter_loader=PeftAdapterLoader(),
+    repository=repository,
+)
+agent = use.build_agent("google/gemma-2-2b-it")
 
-# The model now has "api_v2" knowledge baked into its weights
-response = model.generate(...)
+# Single generation
+print(agent.generate("Explain the API v2 authentication flow"))
+
+# Interactive chat
+session = ChatSession(agent, system_prompt="You are a helpful API expert.")
+print(session.say("How do I authenticate with OAuth2?"))
+```
+
+### CLI
+
+```bash
+# Inspect sources
+llm-patch source list --kind markdown --path ./api_docs
+
+# Compile adapters
+llm-patch adapter compile --source-dir ./api_docs --output-dir ./adapters --checkpoint-dir ./t2l
+
+# Generate text with a patched model
+llm-patch model generate --model-id google/gemma-2-2b-it --adapter-dir ./adapters "Explain OAuth2"
+
+# Interactive chat
+llm-patch model chat --model-id google/gemma-2-2b-it --adapter-dir ./adapters
+
+# Start HTTP API server
+llm-patch serve --model-id google/gemma-2-2b-it --adapter-dir ./adapters
 ```
 
 ---
 
 ## Architecture
 
-The library follows SOLID principles with three pluggable layers coordinated by a central Facade. For a deep dive into the design patterns, data flow, and extensibility points, see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+The library is architected as a generic **Ingest → Compile → Attach → Use** pipeline with pluggable interfaces at every layer. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full design deep-dive.
 
 ```
-┌─────────────────────────────────────────────────┐
-│         KnowledgeFusionOrchestrator (Facade)    │
-├──────────────┬─────────────────┬────────────────┤
-│ IKnowledge   │ IWeight         │ IAdapter       │
-│ Source       │ Generator       │ Repository     │
-│ (Observer)   │ (Strategy)      │ (Repository)   │
-├──────────────┼─────────────────┼────────────────┤
-│ Markdown     │ SakanaT2L       │ LocalSafe      │
-│ Directory    │ Generator       │ tensors        │
-│ Watcher /    │                 │ Repository     │
-│ Wiki Source  │                 │                │
-└──────────────┴─────────────────┴────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│                      Pipelines Layer                         │
+├──────────────────┬──────────────────┬───────────────────────┤
+│  CompilePipeline │   UsePipeline    │    WikiPipeline       │
+│  (ingest→store)  │  (load→serve)    │   (wiki→compile)      │
+├──────────────────┴──────────────────┴───────────────────────┤
+│                      Core Interfaces                         │
+├──────────┬────────────┬──────────┬──────────┬───────────────┤
+│IDataSource│IWeight    │IModel    │IAdapter  │IAgentRuntime  │
+│IKnowledge│ Generator  │Provider  │Loader    │               │
+│ Stream   │            │          │          │               │
+├──────────┼────────────┼──────────┼──────────┼───────────────┤
+│Markdown  │SakanaT2L   │HFModel   │Peft     │PeftAgent      │
+│Wiki, PDF │Generator   │Provider  │Adapter  │Runtime +      │
+│JSONL,HTTP│            │          │Loader   │ChatSession    │
+│Composite │            │          │         │               │
+└──────────┴────────────┴──────────┴──────────┴───────────────┘
 ```
 
 ### Design Patterns
 
-- **Facade Pattern** — `KnowledgeFusionOrchestrator` provides a single entry point. Users interact with the orchestrator, not the individual layers.
-- **Strategy Pattern** — Swap weight generation backends by implementing `IWeightGenerator`. Ship with `SakanaT2LGenerator`; plug in custom hypernetworks or future backends.
-- **Observer Pattern** — `IKnowledgeSource` implementations watch for document changes and notify the orchestrator via callbacks. No polling required.
-- **Repository Pattern** — `IAdapterRepository` decouples adapter persistence from business logic. Store locally with `LocalSafetensorsRepository`, or implement S3, GCS, or HuggingFace Hub backends.
+- **Pipeline Composition** — `CompilePipeline`, `UsePipeline`, and `WikiPipeline` compose interfaces into end-to-end workflows.
+- **Strategy Pattern** — Swap weight generation backends by implementing `IWeightGenerator`.
+- **Data Source Pattern** — `IDataSource` (pull/batch) and `IKnowledgeStream` (push/live). Compose with `CompositeDataSource`.
+- **Repository Pattern** — `IAdapterRepository` decouples adapter persistence from business logic.
+- **Provider Pattern** — `IModelProvider` + `IAdapterLoader` abstract model loading and adapter attachment.
+- **Runtime Pattern** — `IAgentRuntime` provides generate/chat/stream over any patched model.
 
 ### Adapter Output Structure
 
@@ -373,6 +538,15 @@ compiled_adapters/
 | | `recursive` | `True` | Watch subdirectories |
 | | `debounce_seconds` | `0.5` | Debounce interval for rapid saves |
 | `StorageConfig` | `output_dir` | — | Adapter output directory |
+| `ModelSpec` | `model_id` | — | HuggingFace model ID or local path |
+| | `dtype` | `"auto"` | Model dtype (auto, float16, bfloat16) |
+| | `device_map` | `"auto"` | Device mapping for model sharding |
+| `AttachConfig` | `model` | — | `ModelSpec` for base model |
+| | `adapter_ids` | `[]` | Adapter IDs to attach (empty = all) |
+| `AgentConfig` | `system_prompt` | `None` | System instruction for chat |
+| | `max_history` | `0` | Chat history limit (0 = unlimited) |
+| `ServerConfig` | `host` | `"127.0.0.1"` | Server bind host |
+| | `port` | `8000` | Server bind port |
 
 ---
 
@@ -381,14 +555,25 @@ compiled_adapters/
 Build custom backends by implementing the core interfaces:
 
 ```python
-from llm_patch import IWeightGenerator, IAdapterRepository, IKnowledgeSource
+from llm_patch.core.interfaces import (
+    IDataSource, IKnowledgeStream,  # Data ingestion
+    IWeightGenerator,                # Weight generation
+    IAdapterRepository,              # Adapter storage
+    IModelProvider,                  # Model loading
+    IAdapterLoader,                  # Adapter attachment
+    IAgentRuntime,                   # Inference / chat
+)
 ```
 
-**Custom knowledge sources** — Ingest from databases, APIs, CMS platforms, or any structured text source by implementing `IKnowledgeSource`.
+**Custom data sources** — Ingest from databases, APIs, CMS platforms, or any structured text source by implementing `IDataSource`. For live monitoring, also implement `IKnowledgeStream`. Compose multiple sources with `CompositeDataSource`.
 
 **Custom generators** — Integrate alternative hypernetworks, distillation methods, or future text-to-weight approaches by implementing `IWeightGenerator`.
 
 **Custom storage** — Write adapters to S3, Google Cloud Storage, HuggingFace Hub, or any remote storage by implementing `IAdapterRepository`.
+
+**Custom model providers** — Load models from custom registries or specialized frameworks by implementing `IModelProvider`.
+
+**Custom runtimes** — Build alternative inference backends (vLLM, TGI, GGML) by implementing `IAgentRuntime`.
 
 ---
 
@@ -409,19 +594,36 @@ python run_e2e.py --clean --aggregate
 
 This runs the full pipeline end-to-end using mock components — ingesting sample papers, simulating wiki generation, and producing adapter manifests. See [examples/README.md](examples/README.md) for the full tutorial, including batch mode, watch mode, wikilink aggregation, and adapter validation.
 
+### Before/After Knowledge Comparison (Gemini)
+
+A live comparison using `gemini/gemini-2.0-flash` on 2 ML research papers demonstrated:
+
+| Metric | Before (raw LLM) | After (wiki-enhanced) |
+|---|---|---|
+| Answer length | 642 chars | 1,848 chars (+188%) |
+| Domain terms | 3/5 | 5/5 |
+| Citations | 0 | 6 wiki pages |
+| Math formulas | No | Yes |
+
+The wiki-enhanced answer includes specific formulas (attention equation, LoRA decomposition), architectural details (encoder/decoder sub-layers, residual connections), and traceable citations to wiki pages. See [docs/E2E_WALKTHROUGH.md](docs/E2E_WALKTHROUGH.md) for full results and insights.
+
 ---
 
 ## Roadmap
 
-llm-patch is under active development. Here's what's planned:
+llm-patch is under active development. Here's what's been done and what's planned:
 
+- [x] **Generic data source framework** — `IDataSource` / `IKnowledgeStream` with Markdown, Wiki, PDF, JSONL, HTTP API, and Composite sources
+- [x] **Adapter attachment pipeline** — `IModelProvider` + `IAdapterLoader` with HuggingFace + PEFT support
+- [x] **Agent runtime** — `IAgentRuntime` with generate/chat/stream and `ChatSession` history management
+- [x] **Adapter merging** — `merge_into_base()` and `weighted_blend()` for combining adapters
+- [x] **CLI surface** — `source`, `model`, `adapter`, `wiki`, `serve` command groups
+- [x] **REST API server** — FastAPI server with adapter management and inference endpoints
 - [ ] **Cloud storage backends** — S3, GCS, and Azure Blob adapters for `IAdapterRepository`
-- [ ] **Adapter merging** — Combine multiple per-document adapters into a single domain adapter using PEFT's `add_weighted_adapter()`
 - [ ] **Multi-model support** — Extend beyond Gemma to LLaMA, Mistral, Phi, and other architectures
-- [ ] **REST API server** — HTTP service for on-demand adapter generation and serving
 - [ ] **HuggingFace Hub integration** — Push/pull adapters directly from the Hub
 - [ ] **Incremental updates** — Delta adapter generation when documents are partially updated
-- [ ] **Adapter quality scoring** — Automated evaluation of generated adapter quality against ground-truth QA pairs
+- [ ] **Adapter quality scoring** — Automated evaluation of generated adapter quality
 - [ ] **Batch inference optimization** — Process multiple documents in parallel through the hypernetwork
 - [ ] **Web UI dashboard** — Monitor pipeline status, adapter inventory, and generation history
 
@@ -479,6 +681,8 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines, code standards, 
 - **[PEFT](https://github.com/huggingface/peft)** — Parameter-Efficient Fine-Tuning library for loading and managing LoRA adapters
 - **[safetensors](https://github.com/huggingface/safetensors)** — Safe, fast tensor serialization format used for adapter storage
 - **[llm-wiki-agent](https://github.com/SamurAIGPT/llm-wiki-agent)** — LLM-powered wiki generation agent that pairs naturally with llm-patch
+- **[Karpathy's LLM Wiki](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f)** — The pattern for building persistent, compounding knowledge bases with LLMs — a natural knowledge source for llm-patch
+- **[danvega/karpathy-wiki](https://github.com/danvega/karpathy-wiki)** — Community implementation of the LLM Wiki pattern
 
 ### Papers
 
@@ -494,9 +698,10 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines, code standards, 
 | [README.md](README.md) | Project overview, use cases, and quickstart |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | System architecture, design patterns, and data flow |
 | [docs/USAGE.md](docs/USAGE.md) | Installation, configuration, and usage guide |
+| [docs/E2E_WALKTHROUGH.md](docs/E2E_WALKTHROUGH.md) | Step-by-step pipeline walkthrough with Gemini comparison results |
+| [CHANGELOG.md](CHANGELOG.md) | Version history and release notes |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | How to contribute, code standards, and PR checklist |
 | [examples/README.md](examples/README.md) | End-to-end tutorial with example scripts |
-| [NOTES.md](NOTES.md) | Design decisions and implementation notes |
 
 ---
 

@@ -145,11 +145,14 @@ def mock_repository() -> MagicMock:
 
 @pytest.fixture()
 def mock_source() -> MagicMock:
-    """A mock IKnowledgeSource."""
+    """A mock data source (supports both legacy scan_existing and fetch_all)."""
     source = MagicMock()
-    source.scan_existing.return_value = [
+    source.name = "mock"
+    docs = [
         DocumentContext(document_id="doc1", content="Content 1"),
         DocumentContext(document_id="doc2", content="Content 2"),
         DocumentContext(document_id="doc3", content="Content 3"),
     ]
+    source.fetch_all.return_value = docs
+    source.scan_existing.return_value = docs
     return source

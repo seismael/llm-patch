@@ -1,17 +1,20 @@
 # Usage Guide
 
-This guide covers how to install, configure, and use **llm-patch** in common scenarios — from quick local demos to production pipelines.
+This guide covers how to install, configure, and use **llm-patch** — a framework that converts text documents into LoRA adapter weights, attaches them to HuggingFace models, and serves the patched model for inference.
 
 ---
 
 ## Table of Contents
 
 - [Installation](#installation)
+- [Architecture Overview](#architecture-overview)
 - [Quick Start (No GPU)](#quick-start-no-gpu)
-- [Batch Processing](#batch-processing)
-- [Live Watch Mode](#live-watch-mode)
-- [Wiki-Based Pipelines](#wiki-based-pipelines)
-- [Loading Adapters at Inference](#loading-adapters-at-inference)
+- [Data Sources](#data-sources)
+- [Compile Pipeline](#compile-pipeline)
+- [Attach & Runtime](#attach--runtime)
+- [Wiki Pipeline](#wiki-pipeline)
+- [HTTP API Server](#http-api-server)
+- [CLI Reference](#cli-reference)
 - [Configuration](#configuration)
 - [Using the Makefile](#using-the-makefile)
 - [Running Tests](#running-tests)
@@ -27,36 +30,71 @@ This guide covers how to install, configure, and use **llm-patch** in common sce
 |---|---|---|
 | Python | ≥ 3.11 | Required |
 | PyTorch | ≥ 2.1 | CUDA recommended for real weight generation |
-| Poetry | ≥ 1.7 | Dependency management |
 | T2L Checkpoint | — | Required for real (non-mock) generation |
 
-### Install with Poetry
+### Install with pip
 
 ```bash
-git clone https://github.com/your-org/llm-patch.git
+git clone https://github.com/seismael/llm-patch.git
 cd llm-patch
-poetry install
+pip install -e .
 ```
 
-### Install with Dev Dependencies
+### Install Extras
+
+llm-patch uses optional extras to keep the core lightweight:
 
 ```bash
-poetry install --with dev
+# Wiki features (YAML frontmatter parsing)
+pip install -e '.[wiki]'
+
+# CLI interface
+pip install -e '.[cli]'
+
+# PDF document ingestion
+pip install -e '.[pdf]'
+
+# HTTP API data source
+pip install -e '.[http]'
+
+# FastAPI server
+pip install -e '.[server]'
+
+# LLM-powered wiki agents
+pip install -e '.[anthropic]'
+
+# Everything
+pip install -e '.[all]'
 ```
 
-### Install Wiki Extras (Optional)
-
-For robust YAML frontmatter parsing:
+### Install Dev Dependencies
 
 ```bash
-poetry install --extras wiki
+pip install -e '.[all]' --group dev
 ```
+
+---
+
+## Architecture Overview
+
+llm-patch follows a four-stage pipeline:
+
+```
+Ingest → Compile → Attach → Use
+```
+
+| Stage | What it does | Key classes |
+|---|---|---|
+| **Ingest** | Pull documents from markdown dirs, JSONL files, PDFs, HTTP APIs, or wiki structures | `MarkdownDataSource`, `JsonlDataSource`, `PdfDataSource`, `HttpApiDataSource`, `CompositeDataSource` |
+| **Compile** | Convert documents into LoRA adapter weights and store them | `CompilePipeline`, `SakanaT2LGenerator`, `LocalSafetensorsRepository` |
+| **Attach** | Load a base HuggingFace model and attach compiled adapters | `HFModelProvider`, `PeftAdapterLoader`, `UsePipeline` |
+| **Use** | Generate text or chat with the patched model | `PeftAgentRuntime`, `ChatSession` |
 
 ---
 
 ## Quick Start (No GPU)
 
-The fastest way to see llm-patch in action uses mock components — no GPU or T2L checkpoint required:
+The fastest way to see llm-patch in action uses mock components:
 
 ```bash
 cd examples
@@ -67,262 +105,518 @@ This will:
 
 1. Copy sample ML papers from `raw/papers/` into a simulated `wiki/` directory
 2. Add wiki-style frontmatter and create entity stub pages
-3. Run the full pipeline with `MockWeightGenerator` and `MockAdapterRepository`
+3. Run the full pipeline with mock generator and repository
 4. Report all generated adapter manifests
 
-Expected output:
+---
 
+## Data Sources
+
+All data sources implement `IDataSource` with `fetch_all()` and `fetch_one()` methods.
+
+### Markdown Directory
+
+Read `.md` files from a directory:
+
+```python
+from llm_patch.sources.markdown import MarkdownDataSource
+
+source = MarkdownDataSource(
+    directory="./docs",
+    patterns=["*.md"],   # default
+    recursive=True,      # default
+)
+
+for doc in source.fetch_all():
+    print(f"{doc.document_id}: {len(doc.content)} chars")
 ```
-Phase 1: Simulating LLM Wiki Agent output...
-  Created wiki/sources/attention-is-all-you-need.md
-  Created wiki/sources/lora-low-rank-adaptation.md
-  Created wiki/sources/gpt3-few-shot-learners.md
-  Created wiki/entities/transformer.md
-  ...
-Phase 2: Running adapter generation pipeline...
-  Compiled: attention-is-all-you-need → adapters/sources/attention-is-all-you-need
-  Compiled: lora-low-rank-adaptation → adapters/sources/lora-low-rank-adaptation
-  ...
-Phase 3: Complete. Generated 6 adapter manifests.
+
+### JSONL File
+
+Read documents from a JSON Lines file:
+
+```python
+from llm_patch.sources.jsonl import JsonlDataSource
+
+source = JsonlDataSource(
+    path="./data/corpus.jsonl",
+    text_field="text",  # JSON key for content
+    id_field="id",      # JSON key for document ID
+)
+```
+
+### PDF Directory
+
+Requires `pip install 'llm-patch[pdf]'`:
+
+```python
+from llm_patch.sources.pdf import PdfDataSource
+
+source = PdfDataSource(directory="./papers", recursive=True)
+
+for doc in source.fetch_all():
+    print(f"{doc.document_id}: {doc.metadata.get('page_count')} pages")
+```
+
+### HTTP API
+
+Requires `pip install 'llm-patch[http]'`:
+
+```python
+from llm_patch.sources.http_api import HttpApiDataSource
+
+source = HttpApiDataSource(
+    url="https://api.example.com/documents",
+    headers={"Authorization": "Bearer ..."},
+    text_path="content.body",  # dot-path into JSON
+    id_path="meta.id",
+)
+```
+
+### Composite Source
+
+Merge multiple sources into one, with namespaced IDs:
+
+```python
+from llm_patch.sources.composite import CompositeDataSource
+
+combined = CompositeDataSource(
+    markdown_source,
+    jsonl_source,
+    pdf_source,
+    namespace_ids=True,  # IDs become "markdown:doc1", "jsonl:doc2", etc.
+)
+
+# fetch_one routes to the correct source via namespace prefix
+doc = combined.fetch_one("pdf:research-paper")
+```
+
+### Wiki Source
+
+Structured wiki directories with YAML frontmatter and `[[wikilink]]` extraction:
+
+```python
+from llm_patch.sources.wiki import WikiDataSource
+
+source = WikiDataSource(
+    directory="./wiki",
+    aggregate=True,  # follow [[wikilinks]] to enrich documents
+)
+
+for doc in source.fetch_all():
+    print(doc.metadata.get("title"))
+    print(doc.metadata.get("wikilinks"))
 ```
 
 ---
 
-## Batch Processing
+## Compile Pipeline
 
-Process all documents in a directory at once and exit:
-
-### Using the Library API
+`CompilePipeline` connects a data source, weight generator, and adapter repository:
 
 ```python
-from llm_patch import (
-    KnowledgeFusionOrchestrator,
-    SakanaT2LGenerator,
-    LocalSafetensorsRepository,
-    MarkdownDirectoryWatcher,
-    GeneratorConfig,
-    StorageConfig,
-    WatcherConfig,
-)
+from llm_patch import CompilePipeline
+from llm_patch.sources.markdown import MarkdownDataSource
+from llm_patch.generators.sakana_t2l import SakanaT2LGenerator
+from llm_patch.storage.local_safetensors import LocalSafetensorsRepository
+from llm_patch.core.config import GeneratorConfig, StorageConfig
 
-watcher = MarkdownDirectoryWatcher(WatcherConfig(directory="./docs"))
+source = MarkdownDataSource(directory="./docs")
 generator = SakanaT2LGenerator(GeneratorConfig(checkpoint_dir="./models/t2l"))
 repository = LocalSafetensorsRepository(StorageConfig(output_dir="./adapters"))
 
-orchestrator = KnowledgeFusionOrchestrator(
-    source=watcher, generator=generator, repository=repository
-)
+pipeline = CompilePipeline(source, generator, repository)
 
-# Process everything and get manifests
-manifests = orchestrator.compile_all()
+# Batch compile all documents
+manifests = pipeline.compile_all()
 for m in manifests:
     print(f"  {m.adapter_id}: rank={m.rank}, path={m.storage_uri}")
 ```
 
-### Using the Example CLI
-
-```bash
-cd examples
-python research_pipeline.py batch --wiki-dir ./wiki --output-dir ./adapters
-```
-
-With wikilink aggregation (follows `[[links]]` to enrich documents):
-
-```bash
-python research_pipeline.py batch --wiki-dir ./wiki --output-dir ./adapters --aggregate
-```
-
----
-
-## Live Watch Mode
-
-Monitor a directory for changes. Every new or modified Markdown file automatically triggers adapter generation:
-
-### Using the Library API
+### Single Document
 
 ```python
-orchestrator = KnowledgeFusionOrchestrator(
-    source=watcher, generator=generator, repository=repository
-)
+from llm_patch.core.models import DocumentContext
 
-# Context manager handles start/stop
-with orchestrator:
-    # Watcher is running — edit files in ./docs and adapters are generated
-    # Press Ctrl-C to stop
-    import time
-    while True:
-        time.sleep(1)
+doc = DocumentContext(document_id="my-doc", content="Document text here...")
+manifest = pipeline.process_document(doc)
 ```
 
-### Using the Example CLI
+### Live Watch Mode
 
-```bash
-cd examples
-python research_pipeline.py watch --wiki-dir ./wiki
+Pass an `IKnowledgeStream` to auto-compile on file changes:
+
+```python
+from llm_patch.sources.markdown import MarkdownWatcher
+
+watcher = MarkdownWatcher(directory="./docs")
+pipeline = CompilePipeline(source, generator, repository, stream=watcher)
+
+with pipeline:
+    # Watcher is running — edits to ./docs trigger auto-compilation
+    input("Press Enter to stop...\n")
 ```
-
-Add or modify Markdown files in the watched directory while the watcher is running. Press `Ctrl-C` to stop.
 
 ---
 
-## Wiki-Based Pipelines
+## Attach & Runtime
 
-`WikiKnowledgeSource` provides enhanced features for structured wiki directories:
+### Loading a Model with Adapters
 
-### Features
+`UsePipeline` loads a base model, attaches adapters, and optionally wraps it in an agent:
 
-- **YAML frontmatter parsing** — Metadata like `title`, `authors`, `tags` is extracted into `DocumentContext.metadata`
-- **Wikilink extraction** — `[[Entity Name]]` and `[[Entity Name|display text]]` references are captured
-- **Cross-page aggregation** — Optionally follow wikilinks to concatenate linked entity/concept pages into enriched documents
+```python
+from llm_patch import UsePipeline
+from llm_patch.attach.model_provider import HFModelProvider
+from llm_patch.attach.peft_loader import PeftAdapterLoader
+from llm_patch.storage.local_safetensors import LocalSafetensorsRepository
+from llm_patch.core.config import StorageConfig
+
+provider = HFModelProvider()
+loader = PeftAdapterLoader()
+repo = LocalSafetensorsRepository(StorageConfig(output_dir="./adapters"))
+
+use = UsePipeline(provider, loader, repo)
+
+# Load model + attach specific adapters
+handle = use.load_and_attach("google/gemma-2-2b-it", adapter_ids=["my-doc"])
+
+# Or load all available adapters
+handle = use.load_and_attach("google/gemma-2-2b-it")
+```
+
+### Building an Agent
+
+```python
+agent = use.build_agent("google/gemma-2-2b-it", adapter_ids=["my-doc"])
+
+# Single generation
+response = agent.generate("Explain the key concepts in this document")
+
+# Multi-turn chat
+from llm_patch.core.models import ChatMessage, ChatRole
+
+reply = agent.chat([
+    ChatMessage(role=ChatRole.USER, content="What are the main findings?"),
+])
+print(reply.message.content)
+```
+
+### ChatSession (Stateful Conversation)
+
+```python
+from llm_patch.runtime.session import ChatSession
+
+session = ChatSession(
+    runtime=agent,
+    system_prompt="You are a domain expert.",
+    max_history=20,  # keep last 20 messages (0 = unlimited)
+)
+
+answer = session.say("What is LoRA?")
+print(answer)
+
+answer = session.say("How does it relate to transformers?")
+print(answer)
+
+# Access conversation history
+for msg in session.history:
+    print(f"{msg.role}: {msg.content[:80]}")
+
+session.clear()  # reset conversation
+```
+
+### Merging Adapters
+
+```python
+from llm_patch.attach.merger import merge_into_base, weighted_blend
+
+# Blend multiple adapters with different weights
+blended = weighted_blend(handle, {
+    "api-v2": 1.0,
+    "auth-guide": 0.8,
+    "rate-limits": 0.5,
+}, combined_name="api-expert")
+
+# Merge active adapter into base weights (creates standalone model)
+from pathlib import Path
+saved_path = merge_into_base(blended, Path("./merged-model"))
+```
+
+---
+
+## Wiki Pipeline
+
+`WikiPipeline` manages an LLM-maintained wiki and optionally triggers compilation:
+
+```python
+from llm_patch import WikiPipeline
+from llm_patch.core.config import WikiConfig
+from llm_patch.wiki.agents.anthropic_agent import AnthropicWikiAgent
+
+agent = AnthropicWikiAgent(api_key="sk-...")
+config = WikiConfig(base_dir="./wiki", schema_path="./schema.md")
+
+wiki = WikiPipeline(agent, config)
+
+# Initialize wiki directory structure
+wiki.init()
+
+# Ingest a raw source
+result = wiki.ingest(Path("./raw/papers/attention-paper.md"))
+
+# Query the wiki
+answer = wiki.query("How does self-attention work?")
+print(answer.answer)
+print(f"Cited pages: {answer.cited_pages}")
+
+# Run health check
+report = wiki.lint()
+
+# Get wiki status
+status = wiki.status()
+print(f"Pages: {status}")
+```
 
 ### Wiki Directory Structure
 
 ```
-wiki/
-├── sources/              # One page per ingested document
-│   ├── api-v1.md
-│   └── api-v2.md
-├── entities/             # Auto-extracted entity pages
-│   ├── authentication.md
-│   └── rate-limiting.md
-└── concepts/             # Concept pages
-    └── rest-api.md
-```
-
-### Frontmatter Format
-
-```yaml
----
-title: API v2 Documentation
-authors: Platform Team
-version: 2.0
-tags: api, rest, authentication
----
-
-# API v2
-
-Content here...
-```
-
-### Using WikiKnowledgeSource
-
-```python
-from llm_patch import WikiKnowledgeSource, WatcherConfig
-
-source = WikiKnowledgeSource(
-    WatcherConfig(directory="./wiki"),
-    aggregate=True,  # Follow [[wikilinks]] for richer context
-)
-
-# Scan all existing pages
-docs = source.scan_existing()
-for doc in docs:
-    print(f"{doc.document_id}: {doc.metadata.get('title', 'untitled')}")
-    print(f"  Wikilinks: {doc.metadata.get('wikilinks', [])}")
+my-wiki/
+├── raw/                  # Immutable source documents
+│   └── papers/
+├── wiki/                 # LLM-maintained wiki (llm-patch manages this)
+│   ├── sources/          # Summaries of ingested documents
+│   ├── entities/         # Entity pages (people, tools, models)
+│   └── concepts/         # Concept pages
+└── schema.md             # Instructions for the wiki agent
 ```
 
 ---
 
-## Loading Adapters at Inference
+## HTTP API Server
 
-Generated adapters are PEFT-compatible and can be loaded with a single line of code:
+Requires `pip install 'llm-patch[server]'`.
 
-### Basic Loading
-
-```python
-from peft import PeftModel
-from transformers import AutoModelForCausalLM, AutoTokenizer
-
-# Load base model
-base_model = AutoModelForCausalLM.from_pretrained("google/gemma-2-2b-it")
-tokenizer = AutoTokenizer.from_pretrained("google/gemma-2-2b-it")
-
-# Load adapter
-model = PeftModel.from_pretrained(base_model, "./adapters/api-v2")
-
-# Generate
-inputs = tokenizer("How do I authenticate with API v2?", return_tensors="pt")
-outputs = model.generate(**inputs, max_new_tokens=200)
-print(tokenizer.decode(outputs[0], skip_special_tokens=True))
-```
-
-### Dynamic Adapter Swapping
-
-```python
-from peft import PeftModel
-
-base_model = AutoModelForCausalLM.from_pretrained("google/gemma-2-2b-it")
-
-# Load first adapter
-model = PeftModel.from_pretrained(base_model, "./adapters/api-v1", adapter_name="v1")
-
-# Load second adapter
-model.load_adapter("./adapters/api-v2", adapter_name="v2")
-
-# Switch between them per request
-model.set_adapter("v1")
-# ... generate for v1 customer ...
-
-model.set_adapter("v2")
-# ... generate for v2 customer ...
-```
-
-### Merging Multiple Adapters
-
-```python
-# Combine multiple document adapters into a single domain adapter
-model.add_weighted_adapter(
-    adapters=["api-v2", "auth-guide", "rate-limits"],
-    weights=[1.0, 0.8, 0.5],
-    adapter_name="api-v2-complete",
-)
-model.set_adapter("api-v2-complete")
-```
-
-### Adapter Validation
-
-Compare base model output vs. adapter-enhanced output:
+### Start the Server
 
 ```bash
-cd examples
-python validate_adapter.py \
-    --adapter-dir ./adapters/attention-paper \
-    --base-model google/gemma-2-2b-it
+# Via CLI
+llm-patch serve --host 0.0.0.0 --port 8000 --adapter-dir ./adapters
+
+# Via Python
+import uvicorn
+uvicorn.run("llm_patch.server.app:app", host="0.0.0.0", port=8000)
 ```
 
-This requires a CUDA-capable GPU with `torch`, `transformers`, and `peft` installed.
+### Environment Variables
+
+| Variable | Description |
+|---|---|
+| `LLM_PATCH_MODEL_ID` | Auto-load this HuggingFace model on startup |
+| `LLM_PATCH_ADAPTER_DIR` | Adapter storage directory (default: `./adapters`) |
+
+### Endpoints
+
+| Method | Route | Description |
+|---|---|---|
+| GET | `/health` | Health check + version |
+| GET | `/adapters` | List all stored adapters |
+| GET | `/adapters/{id}` | Get adapter details |
+| DELETE | `/adapters/{id}` | Delete an adapter |
+| POST | `/compile` | Compile a document into an adapter |
+| POST | `/generate` | Single-prompt text generation |
+| POST | `/chat` | Multi-turn chat completion |
+
+### Example Requests
+
+```bash
+# Health check
+curl http://localhost:8000/health
+
+# Compile a document
+curl -X POST http://localhost:8000/compile \
+  -H "Content-Type: application/json" \
+  -d '{"document_id": "my-doc", "content": "Document text..."}'
+
+# Generate text
+curl -X POST http://localhost:8000/generate \
+  -H "Content-Type: application/json" \
+  -d '{"prompt": "Explain the key concepts", "max_new_tokens": 256}'
+
+# Chat
+curl -X POST http://localhost:8000/chat \
+  -H "Content-Type: application/json" \
+  -d '{"messages": [{"role": "user", "content": "What is LoRA?"}]}'
+```
+
+---
+
+## CLI Reference
+
+Install the CLI extra: `pip install 'llm-patch[cli]'`
+
+### Wiki Management
+
+```bash
+# Initialize wiki
+llm-patch wiki --base-dir ./wiki init
+
+# Ingest a source file
+llm-patch wiki --base-dir ./wiki ingest ./raw/paper.md
+
+# Query the wiki
+llm-patch wiki --base-dir ./wiki query "How does attention work?"
+
+# Lint (health check)
+llm-patch wiki --base-dir ./wiki lint
+
+# Status overview
+llm-patch wiki --base-dir ./wiki status
+
+# Batch compile all unprocessed sources
+llm-patch wiki --base-dir ./wiki compile
+```
+
+### Data Source Inspection
+
+```bash
+# List documents from a markdown directory
+llm-patch source list --kind markdown --path ./docs
+
+# Count documents
+llm-patch source count --kind jsonl --path ./data.jsonl
+
+# Preview a specific document
+llm-patch source preview --kind markdown --path ./docs my-document-id
+```
+
+### Adapter Compilation (Legacy)
+
+```bash
+# Batch compile
+llm-patch adapter compile --source-dir ./docs --output-dir ./adapters --checkpoint-dir ./models/t2l
+
+# Watch mode
+llm-patch adapter watch --source-dir ./docs --output-dir ./adapters --checkpoint-dir ./models/t2l
+```
+
+### Model & Inference
+
+```bash
+# List adapters
+llm-patch model info --adapter-dir ./adapters
+
+# One-shot generation
+llm-patch model generate --model-id google/gemma-2-2b-it --adapter-dir ./adapters "Explain LoRA"
+
+# Interactive chat
+llm-patch model chat --model-id google/gemma-2-2b-it --adapter-dir ./adapters
+```
+
+### Server
+
+```bash
+llm-patch serve --host 0.0.0.0 --port 8000 --adapter-dir ./adapters
+```
 
 ---
 
 ## Configuration
 
-### GeneratorConfig
+### Config Dataclasses
+
+All configuration uses Pydantic models from `llm_patch.core.config`.
+
+#### GeneratorConfig
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `checkpoint_dir` | `str` | — | Path to the T2L checkpoint directory containing `hypermod.pt`, `args.yaml`, `adapter_config.json` |
-| `device` | `str` | `"cuda"` | PyTorch device (`"cuda"`, `"cpu"`, `"mps"`) |
+| `checkpoint_dir` | `Path` | — | Path to T2L checkpoint directory |
+| `device` | `str` | `"cuda"` | PyTorch device |
 
-### WatcherConfig
-
-| Field | Type | Default | Description |
-|---|---|---|---|
-| `directory` | `str` | — | Directory to monitor for documents |
-| `patterns` | `list[str]` | `["*.md"]` | Glob patterns to match files |
-| `recursive` | `bool` | `True` | Whether to watch subdirectories |
-| `debounce_seconds` | `float` | `0.5` | Debounce interval to prevent duplicate callbacks on rapid saves |
-
-### StorageConfig
+#### StorageConfig
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `output_dir` | `str` | — | Directory where adapters are written |
+| `output_dir` | `Path` | — | Directory for adapter storage |
+
+#### WatcherConfig
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `directory` | `Path` | — | Directory to monitor |
+| `patterns` | `list[str]` | `["*.md"]` | File glob patterns |
+| `recursive` | `bool` | `True` | Watch subdirectories |
+| `debounce_seconds` | `float` | `0.5` | Debounce interval |
+
+#### WikiConfig
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `base_dir` | `Path` | — | Wiki root directory |
+| `schema_path` | `Path \| None` | `None` | Path to wiki schema file |
+| `obsidian` | `bool` | `False` | Obsidian vault mode |
+
+#### ModelSpec
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `model_id` | `str` | — | HuggingFace model identifier |
+| `dtype` | `str` | `"float16"` | Model data type |
+| `device_map` | `str` | `"auto"` | Device placement strategy |
+| `trust_remote_code` | `bool` | `False` | Trust remote model code |
+
+#### AttachConfig
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `adapter_dir` | `Path` | — | Directory containing compiled adapters |
+| `adapter_name` | `str \| None` | `None` | Specific adapter to load |
+
+#### AgentConfig
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `model_spec` | `ModelSpec` | — | Base model specification |
+| `adapter_ids` | `list[str]` | `[]` | Adapters to attach |
+| `generation_max_new_tokens` | `int` | `256` | Max tokens per generation |
+| `generation_temperature` | `float` | `0.7` | Sampling temperature |
+| `system_prompt` | `str \| None` | `None` | Default system prompt |
+
+#### ServerConfig
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `host` | `str` | `"127.0.0.1"` | Server bind address |
+| `port` | `int` | `8000` | Server port |
+| `adapter_dir` | `Path` | `Path("adapters")` | Adapter storage directory |
+| `cors_origins` | `list[str]` | `["*"]` | Allowed CORS origins |
+
+### Data Source Configs
+
+Use the discriminated union `DataSourceConfig` to configure sources declaratively:
+
+```python
+from llm_patch.core.config import MarkdownSourceConfig, JsonlSourceConfig
+
+md_config = MarkdownSourceConfig(
+    type="markdown",
+    directory="./docs",
+    patterns=["*.md"],
+    recursive=True,
+)
+
+jsonl_config = JsonlSourceConfig(
+    type="jsonl",
+    path="./data.jsonl",
+    text_field="text",
+    id_field="id",
+)
+```
 
 ---
 
 ## Using the Makefile
-
-The project includes a Makefile for common development tasks:
 
 ```bash
 make help             # Show all available commands
@@ -348,31 +642,25 @@ make build            # Build distribution packages
 ```bash
 make test
 # or
-poetry run pytest --cov=llm_patch --cov-report=term-missing
+python -m pytest --cov=llm_patch --cov-report=term-missing
 ```
 
 ### Unit Tests Only
 
 ```bash
-make test-unit
-# or
-poetry run pytest tests/unit/ -v
+python -m pytest tests/unit/ -v
 ```
 
 ### Integration Tests Only
 
 ```bash
-make test-integration
-# or
-poetry run pytest tests/integration/ -v -m integration
+python -m pytest tests/integration/ -v
 ```
 
 ### Quick Run (Stop on First Failure)
 
 ```bash
-make test-fast
-# or
-poetry run pytest -x -q
+python -m pytest -x -q
 ```
 
 ---
@@ -383,28 +671,33 @@ poetry run pytest -x -q
 
 **"No module named 'hyper_llm_modulator'"**
 
-The `SakanaT2LGenerator` requires the Sakana AI hypernetwork library. Install it from the [text-to-lora repository](https://github.com/SakanaAI/text-to-lora). For testing without GPU or the Sakana library, use the mock components in `examples/`.
+The `SakanaT2LGenerator` requires the Sakana AI hypernetwork library. For testing without GPU, use mock components in `examples/`.
 
 **"CUDA out of memory"**
 
-The T2L hypernetwork requires GPU memory for inference. Try:
-- Setting `device="cpu"` in `GeneratorConfig` (slower but works without GPU)
-- Using a smaller base model checkpoint
-- Closing other GPU-intensive processes
+Try `device="cpu"` in `GeneratorConfig` or use a smaller model.
 
-**"FileNotFoundError: checkpoint directory not found"**
+**"ModuleNotFoundError: No module named 'pypdf'"**
 
-Ensure `checkpoint_dir` in `GeneratorConfig` points to a directory containing `hypermod.pt`, `args.yaml`, and `adapter_config.json` from the T2L checkpoint.
+Install the PDF extra: `pip install 'llm-patch[pdf]'`
+
+**"ModuleNotFoundError: No module named 'httpx'"**
+
+Install the HTTP extra: `pip install 'llm-patch[http]'`
+
+**"ModuleNotFoundError: No module named 'fastapi'"**
+
+Install the server extra: `pip install 'llm-patch[server]'`
 
 **Adapters not regenerating on file changes**
 
-- Check that the file matches the configured `patterns` (default: `["*.md"]`)
-- Ensure the watcher is running (`orchestrator.start()` or `with orchestrator:`)
-- Check the `debounce_seconds` setting — rapid saves within the debounce window are collapsed into one event
+- Check that files match configured `patterns` (default: `["*.md"]`)
+- Ensure the watcher/stream is running via context manager or `start()`
+- Check `debounce_seconds` — rapid saves within the debounce window are collapsed
 
 **Type checking errors with torch**
 
-Add the following to your `mypy` configuration to ignore missing stubs for PyTorch and related libraries:
+Add to your `mypy` config:
 
 ```toml
 [[tool.mypy.overrides]]
