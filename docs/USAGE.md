@@ -24,6 +24,16 @@ This guide covers how to install, configure, and use **llm-patch** — a framewo
 
 ## Installation
 
+If you are working from this monorepo checkout, prefer the workspace flow:
+
+```pwsh
+uv sync
+```
+
+This installs the engine plus the workspace use-cases declared under
+`projects/*`. The engine console script is `llm-patch`; the wiki use-case
+console script is `llm-patch-wiki-agent`.
+
 ### Prerequisites
 
 | Requirement | Version | Notes |

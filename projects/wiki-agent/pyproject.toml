@@ -1,0 +1,52 @@
+[project]
+name = "llm-patch-wiki-agent"
+version = "0.1.0"
+description = "Wiki-specialized agent built on the llm-patch engine. Compiles a wiki vault into LoRA adapters and serves a domain-expert local LLM."
+authors = [{ name = "llm-patch contributors" }]
+license = { text = "Apache-2.0" }
+readme = "README.md"
+requires-python = ">=3.11"
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Typing :: Typed",
+]
+dependencies = [
+    "llm-patch",
+    "llm-patch-shared",
+    "click>=8.0",
+]
+
+[project.scripts]
+llm-patch-wiki-agent = "llm_patch_wiki_agent.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/llm_patch_wiki_agent"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM", "RUF", "TID", "ARG", "PTH", "TRY"]
+ignore = ["E501", "TRY003"]
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_return_any = true
+warn_unused_configs = true
+files = ["src/llm_patch_wiki_agent", "tests"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--strict-markers -v --basetemp=.pytest_tmp"

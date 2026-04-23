@@ -1,0 +1,38 @@
+name: Release
+
+# Tag format: <project>-vX.Y.Z   e.g. llm-patch-v0.2.0, llm-patch-wiki-agent-v0.1.0
+on:
+  push:
+    tags:
+      - "llm-patch-v*"
+      - "llm-patch-shared-v*"
+      - "llm-patch-wiki-agent-v*"
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write   # PyPI Trusted Publishing
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+      - name: Set up Python
+        run: uv python install 3.11
+      - name: Resolve project from tag
+        id: tag
+        run: |
+          tag="${GITHUB_REF_NAME}"
+          # Strip trailing -vX.Y.Z to get the project distribution name.
+          project="${tag%-v*}"
+          echo "project=$project" >> "$GITHUB_OUTPUT"
+          echo "Resolved project: $project"
+      - name: Sync workspace
+        run: uv sync
+      - name: Run tests for the project
+        run: uv run --package "${{ steps.tag.outputs.project }}" pytest -q
+      - name: Build distribution
+        run: uv build --package "${{ steps.tag.outputs.project }}"
+      - name: Publish to PyPI
+        run: uv publish

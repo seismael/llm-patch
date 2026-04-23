@@ -1,113 +1,71 @@
-.PHONY: help install install-dev test test-unit test-integration lint format typecheck check clean build docs demo
+.PHONY: help sync test test-engine test-shared test-wiki-agent lint typecheck check check-layering check-coverage build clean adr
 
 # ─────────────────────────────────────────────────────────────
-#  llm-patch — Development Commands (uv)
+#  llm-patch monorepo — workspace fan-out commands
+#  Per-project Makefiles live in projects/<name>/Makefile.
 # ─────────────────────────────────────────────────────────────
 
-PYTHON     := python
-UV         := uv
-PYTEST     := $(UV) run pytest
-RUFF       := $(UV) run ruff
-MYPY       := $(UV) run mypy
-PRE_COMMIT := $(UV) run pre-commit
-
-SRC_DIRS   := src/ tests/ examples/
-SRC_CODE   := src/ tests/
-
-# ─────────────────────────────────────────────────────────────
-#  Help
-# ─────────────────────────────────────────────────────────────
+UV := uv
 
 help: ## Show this help message
 	@echo.
-	@echo  llm-patch Development Commands
-	@echo  ──────────────────────────────
-	@echo.
+	@echo  llm-patch monorepo
+	@echo  ──────────────────
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
 		awk 'BEGIN {FS = ":.*?## "}; {printf "  %-20s %s\n", $$1, $$2}'
-	@echo.
 
-# ─────────────────────────────────────────────────────────────
-#  Installation
-# ─────────────────────────────────────────────────────────────
-
-install: ## Install production dependencies
-	$(UV) sync --no-dev
-
-install-dev: ## Install all dependencies (production + dev)
+sync: ## Sync the entire workspace
 	$(UV) sync
-	$(PRE_COMMIT) install
 
-# ─────────────────────────────────────────────────────────────
-#  Testing
-# ─────────────────────────────────────────────────────────────
+# ── Tests ───────────────────────────────────────────────────
 
-test: ## Run all tests with coverage
-	$(PYTEST) --cov=llm_patch --cov-report=term-missing
+test-engine: ## Run engine tests
+	cd projects/llm-patch && $(UV) run pytest -q
 
-test-unit: ## Run unit tests only
-	$(PYTEST) tests/unit/ -v
+test-shared: ## Run shared-utils smoke tests
+	cd projects/shared-utils && $(UV) run pytest -q
 
-test-integration: ## Run integration tests only
-	$(PYTEST) tests/integration/ -v -m integration
+test-wiki-agent: ## Run wiki-agent smoke tests
+	cd projects/wiki-agent && $(UV) run pytest -q
 
-test-fast: ## Run tests without coverage (faster)
-	$(PYTEST) -x -q
+test: test-engine test-shared test-wiki-agent ## Run tests for every workspace member
 
-# ─────────────────────────────────────────────────────────────
-#  Code Quality
-# ─────────────────────────────────────────────────────────────
+# ── Quality ─────────────────────────────────────────────────
 
-lint: ## Run linter (ruff check)
-	$(RUFF) check $(SRC_CODE)
+lint: ## Lint the entire workspace
+	$(UV) run ruff check .
 
-format: ## Auto-format code (ruff format)
-	$(RUFF) format $(SRC_CODE)
-	$(RUFF) check --fix $(SRC_CODE)
+typecheck: ## Mypy strict for every project
+	cd projects/llm-patch && $(UV) run mypy src
+	cd projects/shared-utils && $(UV) run mypy src
+	cd projects/wiki-agent && $(UV) run mypy src
 
-typecheck: ## Run static type checker (mypy)
-	$(MYPY) src/
+check-layering: ## Architectural fitness check (ADR-0002)
+	$(UV) run python tools/check_layering.py
 
-check: lint typecheck test ## Run all checks (lint + typecheck + test)
+check-coverage: ## Enforce workspace coverage thresholds
+	cd projects/llm-patch && $(UV) run pytest --cov=llm_patch --cov-branch --cov-report=xml:coverage.xml -q
+	$(UV) run python tools/check_coverage.py projects/llm-patch/coverage.xml
 
-# ─────────────────────────────────────────────────────────────
-#  Build & Release
-# ─────────────────────────────────────────────────────────────
+check: lint typecheck check-layering test check-coverage ## Lint + typecheck + layering + tests
 
-build: clean ## Build distribution packages
-	$(UV) build
+# ── Build ───────────────────────────────────────────────────
 
-publish-test: build ## Publish to TestPyPI
-	$(UV) publish --index testpypi
+build: ## Build distributions for every project
+	cd projects/llm-patch && $(UV) build
+	cd projects/shared-utils && $(UV) build
+	cd projects/wiki-agent && $(UV) build
 
-publish: build ## Publish to PyPI
-	$(UV) publish
+# ── ADR helper ──────────────────────────────────────────────
 
-# ─────────────────────────────────────────────────────────────
-#  Demo & Examples
-# ─────────────────────────────────────────────────────────────
+adr: ## Scaffold a new ADR: make adr title="my-decision"
+	@test -n "$(title)" || (echo "Usage: make adr title=\"my-decision\""; exit 2)
+	@next=$$(printf '%04d' $$(($$(ls docs/adr/[0-9]*.md 2>/dev/null | wc -l) + 1))); \
+		cp docs/adr/0000-template.md "docs/adr/$$next-$(title).md"; \
+		echo "Created docs/adr/$$next-$(title).md"
 
-demo: ## Run the end-to-end demo (no GPU required)
-	cd examples && $(PYTHON) run_e2e.py --clean --aggregate
+# ── Cleanup ─────────────────────────────────────────────────
 
-demo-batch: ## Run batch mode on example wiki
-	cd examples && $(PYTHON) research_pipeline.py batch --wiki-dir wiki/ --aggregate
-
-demo-watch: ## Run watch mode on example wiki (Ctrl-C to stop)
-	cd examples && $(PYTHON) research_pipeline.py watch --wiki-dir wiki/
-
-# ─────────────────────────────────────────────────────────────
-#  Cleanup
-# ─────────────────────────────────────────────────────────────
-
-clean: ## Remove build artifacts and caches
-	rm -rf dist/ build/ *.egg-info
-	rm -rf .pytest_cache .pytest_tmp .mypy_cache .ruff_cache
-	rm -rf htmlcov .coverage
-	find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
-	find . -type f -name "*.pyc" -delete 2>/dev/null || true
-
-clean-adapters: ## Remove generated adapters from examples
-	rm -rf examples/adapters/ examples/wiki/
-
-clean-all: clean clean-adapters ## Remove everything (build artifacts + adapters)
+clean: ## Remove caches and build artifacts
+	rm -rf dist build .pytest_cache .pytest_tmp .mypy_cache .ruff_cache htmlcov .coverage coverage.xml
+	find . -type d -name __pycache__ -prune -exec rm -rf {} + 2>/dev/null || true

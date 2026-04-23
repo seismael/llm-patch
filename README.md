@@ -34,6 +34,7 @@ The result: **your language model learns new knowledge instantly**, without grad
 
 ## Table of Contents
 
+- [Workspace Layout](#workspace-layout)
 - [Why llm-patch?](#why-llm-patch)
 - [How It Works](#how-it-works)
 - [Use Cases](#use-cases)
@@ -49,6 +50,56 @@ The result: **your language model learns new knowledge instantly**, without grad
 - [Community & Links](#community--links)
 - [Documentation](#documentation)
 - [License](#license)
+
+---
+
+---
+
+## Workspace Layout
+
+This repository is a **uv workspace monorepo**. The structure is:
+
+```
+projects/
+  llm-patch/         engine — generic Ingest → Compile → Attach → Use framework
+  shared-utils/      cross-project, stdlib-only utilities (llm_patch_shared)
+  wiki-agent/        first downstream use-case (llm_patch_wiki_agent)
+docs/
+  adr/               Architecture Decision Records (MADR format)
+  ARCHITECTURE.md, USAGE.md, E2E_WALKTHROUGH.md
+tools/               cross-project scripts (scaffolding, layering, coverage)
+.github/
+  instructions/      scoped agent instructions (applyTo)
+  workflows/         CI / release pipelines
+SPEC.md              binding engineering specification
+AGENTS.md            root agent contract
+```
+
+| Project | Description | Test command |
+|---|---|---|
+| [`projects/llm-patch`](projects/llm-patch) | The generic engine. | `uv run --package llm-patch pytest` |
+| [`projects/shared-utils`](projects/shared-utils) | Cross-project utilities (stdlib-only). | `uv run --package llm-patch-shared pytest` |
+| [`projects/wiki-agent`](projects/wiki-agent) | Wiki-specialized agent with `compile`, one-shot `chat`, and `info` commands built on the engine. | `uv run --package llm-patch-wiki-agent pytest` |
+
+Dependencies flow **one-way**: use-cases → engine → shared-utils.
+Enforced by [tools/check_layering.py](tools/check_layering.py).
+
+### Authoritative Documents
+
+- [SPEC.md](SPEC.md) — binding engineering specification (SOLID, GoF, TDD, layering).
+- [AGENTS.md](AGENTS.md) — root agent contract and pre-change checklist.
+- [docs/adr/README.md](docs/adr/README.md) — Architecture Decision Records.
+- Per-project `AGENTS.md` files under each `projects/<name>/` directory.
+
+### Adding a New Use-Case Project
+
+```pwsh
+uv run python tools/scaffold_project.py <name>
+```
+
+This materializes the standardized layout (src/, tests/{unit,integration}/,
+docs/, data/, artifacts/, examples/, pyproject.toml, AGENTS.md, README.md,
+CHANGELOG.md). The project is automatically picked up by the workspace.
 
 ---
 

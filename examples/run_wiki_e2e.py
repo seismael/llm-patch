@@ -25,7 +25,6 @@ from __future__ import annotations
 
 import argparse
 import logging
-import os
 import shutil
 import sys
 import time
@@ -51,6 +50,7 @@ logger = logging.getLogger("wiki-e2e")
 # Helpers
 # ──────────────────────────────────────────────────────────────────────
 
+
 def _banner(text: str) -> None:
     width = max(len(text) + 4, 60)
     logger.info("=" * width)
@@ -66,6 +66,7 @@ def _section(text: str) -> None:
 # ──────────────────────────────────────────────────────────────────────
 # Pipeline stages
 # ──────────────────────────────────────────────────────────────────────
+
 
 def create_agent(args: argparse.Namespace):
     """Create the wiki agent based on CLI flags."""
@@ -202,7 +203,9 @@ def run_pipeline(args: argparse.Namespace) -> bool:
 
     # Check: All raw sources ingested
     if len(ingest_results) != len(raw_files):
-        logger.error("FAIL: Expected %d ingest results, got %d", len(raw_files), len(ingest_results))
+        logger.error(
+            "FAIL: Expected %d ingest results, got %d", len(raw_files), len(ingest_results)
+        )
         ok = False
     else:
         logger.info("PASS: All %d raw sources ingested", len(raw_files))
@@ -219,7 +222,9 @@ def run_pipeline(args: argparse.Namespace) -> bool:
 
     # Check: Index has entries
     if len(manager.index) >= len(ingest_results):
-        logger.info("PASS: Index has %d entries (>= %d sources)", len(manager.index), len(ingest_results))
+        logger.info(
+            "PASS: Index has %d entries (>= %d sources)", len(manager.index), len(ingest_results)
+        )
     else:
         logger.error("FAIL: Index has only %d entries", len(manager.index))
         ok = False
@@ -255,29 +260,35 @@ def run_pipeline(args: argparse.Namespace) -> bool:
 # CLI
 # ──────────────────────────────────────────────────────────────────────
 
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="Run the full LLM Wiki E2E pipeline",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(
-        "--base-dir", default=".",
+        "--base-dir",
+        default=".",
         help="Root project directory (default: current dir)",
     )
     parser.add_argument(
-        "--mock", action="store_true",
+        "--mock",
+        action="store_true",
         help="Use MockWikiAgent instead of Claude (no API key needed)",
     )
     parser.add_argument(
-        "--api-key", default=None,
+        "--api-key",
+        default=None,
         help="Anthropic API key (default: ANTHROPIC_API_KEY env var)",
     )
     parser.add_argument(
-        "--model", default=None,
+        "--model",
+        default=None,
         help="Claude model name (default: claude-sonnet-4-20250514)",
     )
     parser.add_argument(
-        "--schema", default=None,
+        "--schema",
+        default=None,
         help="Path to a CLAUDE.md-style wiki schema file",
     )
     args = parser.parse_args()

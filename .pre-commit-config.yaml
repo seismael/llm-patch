@@ -5,6 +5,7 @@ repos:
       - id: trailing-whitespace
       - id: end-of-file-fixer
       - id: check-yaml
+      - id: check-toml
       - id: check-added-large-files
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
@@ -13,3 +14,30 @@ repos:
       - id: ruff
         args: [--fix]
       - id: ruff-format
+
+  - repo: local
+    hooks:
+      - id: mypy-engine
+        name: mypy-engine
+        entry: uv run --package llm-patch mypy --config-file projects/llm-patch/pyproject.toml projects/llm-patch/src projects/llm-patch/tests
+        language: system
+        pass_filenames: false
+        files: '^projects/llm-patch/.+\.py$'
+      - id: mypy-shared-utils
+        name: mypy-shared-utils
+        entry: uv run --package llm-patch-shared mypy --config-file projects/shared-utils/pyproject.toml projects/shared-utils/src projects/shared-utils/tests
+        language: system
+        pass_filenames: false
+        files: '^projects/shared-utils/.+\.py$'
+      - id: mypy-wiki-agent
+        name: mypy-wiki-agent
+        entry: uv run --package llm-patch-wiki-agent mypy --config-file projects/wiki-agent/pyproject.toml projects/wiki-agent/src projects/wiki-agent/tests
+        language: system
+        pass_filenames: false
+        files: '^projects/wiki-agent/.+\.py$'
+      - id: check-layering
+        name: check-layering (ADR-0002)
+        entry: python tools/check_layering.py
+        language: system
+        pass_filenames: false
+        files: '^projects/.+\.py$'

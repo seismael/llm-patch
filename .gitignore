@@ -93,6 +93,14 @@ raw/
 .obsidian/
 
 # ─────────────────────────────────────────────────────────────
+#  Per-project data / artifacts (created by tools/scaffold_project.py)
+# ─────────────────────────────────────────────────────────────
+projects/*/data/
+!projects/*/data/.gitkeep
+projects/*/artifacts/
+!projects/*/artifacts/.gitkeep
+
+# ─────────────────────────────────────────────────────────────
 #  Misc
 # ─────────────────────────────────────────────────────────────
 *.log

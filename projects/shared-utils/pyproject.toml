@@ -1,0 +1,45 @@
+[project]
+name = "llm-patch-shared"
+version = "0.1.0"
+description = "Cross-project shared utilities for the llm-patch monorepo (logging, config, telemetry, error types). Stdlib-only — no domain logic."
+authors = [{ name = "llm-patch contributors" }]
+license = { text = "Apache-2.0" }
+readme = "README.md"
+requires-python = ">=3.11"
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Typing :: Typed",
+]
+# Stdlib only by policy. New runtime deps require an ADR.
+dependencies = []
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/llm_patch_shared"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM", "RUF", "TID", "ARG", "PTH", "TRY"]
+ignore = ["E501", "TRY003"]
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_return_any = true
+warn_unused_configs = true
+files = ["src/llm_patch_shared", "tests"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--strict-markers -v --basetemp=.pytest_tmp"

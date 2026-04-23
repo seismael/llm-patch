@@ -1,57 +1,27 @@
+#
+# llm-patch monorepo — uv workspace root
+# ---------------------------------------------------------------
+# This file defines the workspace and **shared tool configuration only**.
+# Each project under projects/<name>/ owns its own [project] table,
+# its own dependencies, and its own version. See SPEC.md for the
+# governing engineering specification.
+#
+
 [project]
-name = "llm-patch"
-version = "0.1.0"
-description = "Instant Knowledge Internalization — Convert documents into LoRA adapter weights using Text-to-LoRA hypernetworks"
-authors = [{ name = "llm-patch contributors" }]
-license = { text = "Apache-2.0" }
-readme = "README.md"
+name = "llm-patch-workspace"
+version = "0.0.0"
+description = "Monorepo workspace root for the llm-patch engine and downstream use-cases. Not a publishable package."
 requires-python = ">=3.11"
-keywords = ["lora", "hypernetwork", "llm", "fine-tuning", "adapters"]
-classifiers = [
-    "Development Status :: 3 - Alpha",
-    "Intended Audience :: Developers",
-    "Topic :: Scientific/Engineering :: Artificial Intelligence",
-    "Typing :: Typed",
-]
-dependencies = [
-    "torch>=2.1",
-    "transformers>=4.40",
-    "peft>=0.12",
-    "safetensors>=0.4",
-    "pydantic>=2.0",
-    "watchdog>=4.0",
-]
+# This package is intentionally empty — it only exists so uv can resolve
+# the workspace. Real code lives under projects/*.
 
-[project.urls]
-Homepage = "https://github.com/seismael/llm-patch"
-Repository = "https://github.com/seismael/llm-patch"
-Documentation = "https://github.com/seismael/llm-patch#readme"
-Changelog = "https://github.com/seismael/llm-patch/blob/main/CHANGELOG.md"
-"Bug Tracker" = "https://github.com/seismael/llm-patch/issues"
+[tool.uv.workspace]
+members = ["projects/*"]
 
-[project.optional-dependencies]
-wiki = ["pyyaml"]
-cli = ["click>=8.0"]
-mcp = ["mcp>=1.0"]
-llm = ["litellm>=1.0"]
-anthropic = ["anthropic>=0.40"]
-pdf = ["pypdf>=4.0"]
-http = ["httpx>=0.24"]
-server = ["fastapi>=0.100", "uvicorn>=0.20"]
-all = [
-    "pyyaml",
-    "click>=8.0",
-    "mcp>=1.0",
-    "litellm>=1.0",
-    "anthropic>=0.40",
-    "pypdf>=4.0",
-    "httpx>=0.24",
-    "fastapi>=0.100",
-    "uvicorn>=0.20",
-]
-
-[project.scripts]
-llm-patch = "llm_patch.cli:main"
+[tool.uv.sources]
+llm-patch         = { workspace = true }
+llm-patch-shared  = { workspace = true }
+llm-patch-wiki-agent = { workspace = true }
 
 [dependency-groups]
 dev = [
@@ -62,53 +32,84 @@ dev = [
     "mypy>=1.10",
     "ruff>=0.5",
     "pre-commit>=3.0",
+    "typer>=0.12",
 ]
 
-[build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
-
-[tool.hatch.build.targets.wheel]
-packages = ["src/llm_patch"]
+# ─────────────────────────────────────────────────────────────
+#  Shared lint configuration (inherited by every project)
+# ─────────────────────────────────────────────────────────────
 
 [tool.ruff]
 target-version = "py311"
 line-length = 100
-src = ["src", "tests"]
+extend-exclude = [".venv", "dist", "build", "**/__pycache__"]
 
 [tool.ruff.lint]
-select = ["E", "F", "W", "I", "UP", "B", "SIM", "RUF"]
-ignore = ["E501"]
-
-[tool.ruff.lint.per-file-ignores]
-"examples/*.py" = ["E402"]
+# Strict baseline. Per-project pyproject files may add per-file ignores
+# via [tool.ruff.lint.per-file-ignores] for grandfathered legacy code.
+select = [
+    "E", "F", "W",   # pycodestyle + pyflakes
+    "I",             # isort
+    "UP",            # pyupgrade
+    "B",             # flake8-bugbear
+    "SIM",           # flake8-simplify
+    "RUF",           # ruff-specific
+    "TID",           # tidy imports
+    "ARG",           # unused arguments
+    "PTH",           # use pathlib
+    "TRY",           # tryceratops
+]
+ignore = [
+    "E501",          # line length handled by formatter
+    "TRY003",        # long messages in exceptions are fine for our domain
+]
 
 [tool.ruff.lint.isort]
-known-first-party = ["llm_patch"]
+known-first-party = ["llm_patch", "llm_patch_shared", "llm_patch_wiki_agent"]
+
+[tool.ruff.lint.per-file-ignores]
+"examples/demo_e2e_scenario.py" = ["ARG001", "ARG002", "E402"]
+"examples/research_pipeline.py" = ["ARG002", "E402"]
+"examples/run_wiki_e2e.py" = ["E402", "TRY400"]
+"scripts/run_gemini_comparison.py" = ["PTH123", "RUF001", "SIM115"]
 
 [tool.ruff.format]
 quote-style = "double"
+
+# ─────────────────────────────────────────────────────────────
+#  Shared mypy baseline (each project re-declares its src path)
+# ─────────────────────────────────────────────────────────────
 
 [tool.mypy]
 python_version = "3.11"
 strict = true
 warn_return_any = true
 warn_unused_configs = true
-# plugins = ["pydantic.mypy"]  # disabled: causes hang on this system
 
-[[tool.mypy.overrides]]
-module = [
-    "torch.*",
-    "safetensors.*",
-    "watchdog.*",
-    "hyper_llm_modulator.*",
-]
-ignore_missing_imports = true
-follow_imports = "skip"
+# ─────────────────────────────────────────────────────────────
+#  Shared pytest defaults (each project sets its own testpaths)
+# ─────────────────────────────────────────────────────────────
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
-addopts = "--strict-markers -v --basetemp=.pytest_tmp"
+addopts = "--strict-markers -v"
 markers = [
     "integration: marks tests as integration tests (deselect with '-m \"not integration\"')",
 ]
+
+# ─────────────────────────────────────────────────────────────
+#  Coverage
+# ─────────────────────────────────────────────────────────────
+
+[tool.coverage.report]
+fail_under = 75
+show_missing = true
+skip_covered = false
+exclude_lines = [
+    "pragma: no cover",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+]
+
+[tool.coverage.run]
+branch = true

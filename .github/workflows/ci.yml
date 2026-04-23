@@ -1,0 +1,98 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: lint + typecheck + layering
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+      - name: Set up Python
+        run: uv python install 3.11
+      - name: Sync workspace
+        run: uv sync
+      - name: Ruff lint
+        run: uv run ruff check .
+      - name: Ruff format check
+        run: uv run ruff format --check .
+      - name: Layering check
+        run: uv run python tools/check_layering.py
+      - name: Mypy (engine)
+        working-directory: projects/llm-patch
+        run: uv run mypy src
+      - name: Mypy (shared-utils)
+        working-directory: projects/shared-utils
+        run: uv run mypy src
+      - name: Mypy (wiki-agent)
+        working-directory: projects/wiki-agent
+        run: uv run mypy src
+
+  test:
+    name: tests (${{ matrix.project }} on py${{ matrix.python }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.11", "3.12"]
+        project:
+          - llm-patch
+          - llm-patch-shared
+          - llm-patch-wiki-agent
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+      - name: Set up Python ${{ matrix.python }}
+        run: uv python install ${{ matrix.python }}
+      - name: Sync workspace
+        run: uv sync
+      - name: Run tests
+        run: |
+          if [ "${{ matrix.project }}" = "llm-patch" ]; then
+            cd projects/llm-patch
+            uv run pytest -q
+          elif [ "${{ matrix.project }}" = "llm-patch-shared" ]; then
+            cd projects/shared-utils
+            uv run pytest -q
+          else
+            cd projects/wiki-agent
+            uv run pytest -q
+          fi
+      - name: Check engine coverage
+        if: matrix.project == 'llm-patch' && matrix.python == '3.11'
+        run: |
+          cd projects/llm-patch
+          uv run pytest --cov=llm_patch --cov-branch --cov-report=xml:coverage.xml -q
+          cd ../..
+          uv run python tools/check_coverage.py projects/llm-patch/coverage.xml
+
+  changelog:
+    name: changelog enforcement
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Compute changed files
+        id: diff
+        run: |
+          git diff --name-only origin/${{ github.base_ref }}...HEAD > .changed
+          cat .changed
+      - uses: astral-sh/setup-uv@v3
+      - name: Set up Python
+        run: uv python install 3.11
+      - name: Run changelog check
+        run: cat .changed | uv run python tools/check_changelog.py

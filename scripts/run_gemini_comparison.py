@@ -4,6 +4,7 @@ Strategy: manually populate wiki pages from paper content to avoid
 the 15+ API calls needed for agent-based ingestion. Only 2 Gemini
 API calls are needed: one BEFORE (raw) and one AFTER (wiki-enhanced).
 """
+
 import os
 import shutil
 import sys
@@ -23,11 +24,14 @@ if env_path.exists():
 os.environ["LITELLM_LOCAL_MODEL_COST_MAP"] = "True"
 
 import logging  # noqa: E402
+
 logging.basicConfig(
     level=logging.WARNING,
     format="[%(levelname)s] %(name)s: %(message)s",
     stream=sys.stdout,
 )
+
+import litellm  # noqa: E402
 
 from llm_patch.wiki.agents.litellm_agent import LiteLLMWikiAgent  # noqa: E402
 from llm_patch.wiki.index import IndexEntry, WikiIndex  # noqa: E402
@@ -39,7 +43,6 @@ from llm_patch.wiki.page import (  # noqa: E402
     WikiPageFrontmatter,
 )
 
-import litellm  # noqa: E402
 litellm.suppress_debug_info = True
 
 RAW_PAPERS = Path(__file__).resolve().parents[1] / "examples" / "raw" / "papers"
@@ -52,6 +55,7 @@ QUESTION = (
 
 class DualWriter:
     """Write to both stdout and a file."""
+
     def __init__(self, filepath: Path):
         self.file = open(filepath, "w", encoding="utf-8")
         self.stdout = sys.stdout
@@ -223,13 +227,15 @@ def build_wiki(wiki_dir: Path, index: WikiIndex) -> int:
         page_path.write_text(page.to_markdown(), encoding="utf-8")
 
         category = spec["type"].value + "s"
-        index.add_entry(IndexEntry(
-            path=spec["path"],
-            title=spec["title"],
-            summary=spec["body"][:100].replace("\n", " ").strip(),
-            tags=spec["tags"],
-            category=category,
-        ))
+        index.add_entry(
+            IndexEntry(
+                path=spec["path"],
+                title=spec["title"],
+                summary=spec["body"][:100].replace("\n", " ").strip(),
+                tags=spec["tags"],
+                category=category,
+            )
+        )
         count += 1
     index.save()
     return count
