@@ -77,6 +77,9 @@ contributions must respect them.
 | **Observer** | `IKnowledgeStream.subscribe(...)` | Push-based ingestion via callback subscription. |
 | **Adapter** | `MarkdownDataSource` ↔ `IDataSource`, `PeftAdapterLoader` ↔ `IAdapterLoader` | Bridges third-party APIs to engine ABCs. |
 | **Template Method** | `WikiManager.ingest_*` flow | Fixed skeleton with overridable hooks. |
+| **Repository (network)** | `IAdapterRegistryClient` | Same Repository pattern across the network boundary; concretes live outside the engine ([ADR-0006](docs/adr/0006-distributed-adapter-registry.md)). |
+| **Decorator / Cache** | `IAdapterCache`, `LRUAdapterCache` | Bounded LRU cache layered over manifest resolution; pure-stdlib reference impl. |
+| **Strategy (runtime control)** | `IRuntimeAdapterController`, `PeftRuntimeController` | Hot-swap on a live `ModelHandle`; serialized via lock per [SERVER_ARCHITECTURE.md](docs/SERVER_ARCHITECTURE.md). |
 
 **Rule R-3.1**: Adding a new data source / generator / storage / model
 provider / runtime is done by **implementing the existing ABC**, not by
@@ -120,8 +123,11 @@ plus a major-version bump.
     `pytest -m integration`. May touch the filesystem under `tmp_path`.
 - **R-5.4** Tests follow Arrange-Act-Assert and assert one behavior per
   test. Mock at the boundary, not in the middle.
-- **R-5.5** A failing baseline is a release blocker. Engine baseline:
-  `216 passed, 3 skipped`.
+- **R-5.5** A failing baseline is a release blocker. Engine baseline
+  for `0.2.0`: `379 passed, 12 skipped` (engine), plus the new
+  adapter-market unit tests under `tests/unit/test_adapter_manifest_v2.py`,
+  `test_lru_cache.py`, `test_runtime_controller.py`,
+  `test_cli_distribute.py`, `test_preflight.py`.
 
 ---
 

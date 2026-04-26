@@ -1,0 +1,38 @@
+name: New registry-client plugin (`IAdapterRegistryClient`)
+description: Propose or announce a new adapter-market transport (HTTP hub, S3, OCI, …).
+labels: ["type:plugin", "area:registry"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this template for adapter-market transports. See
+        [docs/REGISTRY_PROTOCOL.md](../../docs/REGISTRY_PROTOCOL.md)
+        for the wire format and
+        [docs/EXTENDING.md](../../docs/EXTENDING.md) for plugin
+        packaging.
+  - type: input
+    id: name
+    attributes:
+      label: Plugin name
+      placeholder: "s3-registry"
+    validations:
+      required: true
+  - type: input
+    id: package
+    attributes:
+      label: Package / repo URL
+  - type: textarea
+    id: transport
+    attributes:
+      label: Transport summary
+      description: Describe auth, rate limits, immutability guarantees.
+    validations:
+      required: true
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist
+      options:
+        - label: Implements `search`, `fetch`, `publish` per `IAdapterRegistryClient`.
+        - label: Honours the manifest v2 schema (see REGISTRY_PROTOCOL.md).
+        - label: Factory callable exposed for `LLM_PATCH_PLUGIN_REGISTRY` env var or entry point.

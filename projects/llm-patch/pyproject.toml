@@ -1,6 +1,6 @@
 [project]
 name = "llm-patch"
-version = "0.1.0"
+version = "1.0.0rc1"
 description = "Instant Knowledge Internalization — Convert documents into LoRA adapter weights using Text-to-LoRA hypernetworks"
 authors = [{ name = "llm-patch contributors" }]
 license = { text = "Apache-2.0" }

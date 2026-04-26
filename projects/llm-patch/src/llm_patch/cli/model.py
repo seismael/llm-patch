@@ -59,19 +59,23 @@ def generate(
 
 
 @model.command()
-@click.option("--model-id", required=True, help="HuggingFace model ID or local path.")
+@click.option(
+    "--model-id",
+    default=None,
+    help="HuggingFace model ID or local path (default: [runtime].base_model from .llm-patch.toml).",
+)
 @click.option(
     "--adapter-dir",
-    type=click.Path(exists=True, file_okay=False, path_type=Path),
-    required=True,
-    help="Directory containing compiled adapters.",
+    type=click.Path(file_okay=False, path_type=Path),
+    default=None,
+    help="Directory containing compiled adapters (default: [compile].output from .llm-patch.toml).",
 )
 @click.option("--adapter-id", "adapter_ids", multiple=True, help="Specific adapter IDs to attach.")
 @click.option("--device", default="auto", help="Device map (default: auto).")
 @click.option("--system", default=None, help="System prompt for the conversation.")
 def chat(
-    model_id: str,
-    adapter_dir: Path,
+    model_id: str | None,
+    adapter_dir: Path | None,
     adapter_ids: tuple[str, ...],
     device: str,
     system: str | None,
@@ -79,10 +83,29 @@ def chat(
     """Interactive chat with a patched model (Ctrl-C to exit)."""
     from llm_patch.attach import HFModelProvider, PeftAdapterLoader
     from llm_patch.core.config import StorageConfig
+    from llm_patch.core.project_config import ProjectConfig
     from llm_patch.pipelines.use import UsePipeline
     from llm_patch.runtime.agent import PeftAgentRuntime
     from llm_patch.runtime.session import ChatSession
     from llm_patch.storage.local_safetensors import LocalSafetensorsRepository
+
+    config = ProjectConfig.find_and_load()
+    if model_id is None:
+        model_id = config.runtime.base_model if config else None
+    if adapter_dir is None:
+        adapter_dir = config.compile.output if config else None
+    if model_id is None:
+        raise click.ClickException(
+            "Missing --model-id. Provide --model-id or set [runtime] base_model "
+            "in .llm-patch.toml."
+        )
+    if adapter_dir is None:
+        raise click.ClickException(
+            "Missing --adapter-dir. Provide --adapter-dir or set [compile] output "
+            "in .llm-patch.toml."
+        )
+    if not adapter_dir.exists() or not adapter_dir.is_dir():
+        raise click.ClickException(f"--adapter-dir does not exist: {adapter_dir}")
 
     repo = LocalSafetensorsRepository(StorageConfig(output_dir=adapter_dir))
     pipeline = UsePipeline(

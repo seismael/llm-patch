@@ -13,18 +13,28 @@ dependency requires an ADR under ``docs/adr/``. **Never** depend on
 __version__ = "0.1.0"
 
 from llm_patch_shared.errors import (
+    AdapterNotFoundError,
+    CapacityExceededError,
+    ChecksumMismatchError,
     ConfigurationError,
     DependencyError,
+    IncompatibleBaseModelError,
     IntegrationError,
     LlmPatchError,
+    RegistryUnavailableError,
     ResourceNotFoundError,
 )
 
 __all__ = [
+    "AdapterNotFoundError",
+    "CapacityExceededError",
+    "ChecksumMismatchError",
     "ConfigurationError",
     "DependencyError",
+    "IncompatibleBaseModelError",
     "IntegrationError",
     "LlmPatchError",
+    "RegistryUnavailableError",
     "ResourceNotFoundError",
     "__version__",
 ]

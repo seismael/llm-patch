@@ -122,7 +122,16 @@ refactor: extract frontmatter parsing into utility
 
 Here are some areas where contributions are especially welcome:
 
-### New Knowledge Sources (`IKnowledgeSource`)
+### Plugins (`pip install`-able add-ons)
+
+`llm-patch` 0.3.0 ships a discovery mechanism (env var + entry point)
+so plugins live outside the engine. See
+[docs/EXTENDING.md](docs/EXTENDING.md) for the contract and
+[docs/adr/0008-plugin-discovery.md](docs/adr/0008-plugin-discovery.md)
+for the design rationale. To announce a plugin, open an issue using
+the **New source plugin** or **New registry-client plugin** template.
+
+### New Knowledge Sources (`IDataSource`)
 
 - Confluence / Notion integration
 - Database table watcher (PostgreSQL, SQLite)

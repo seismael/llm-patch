@@ -12,6 +12,48 @@ class AdapterInfo(BaseModel):
     rank: int
     target_modules: list[str]
     storage_uri: str
+    namespace: str | None = None
+    version: str | None = None
+    checksum_sha256: str | None = None
+    base_model_compatibility: list[str] = Field(default_factory=list)
+    tags: list[str] = Field(default_factory=list)
+    description: str | None = None
+
+
+# ── Adapter Market / Hot-swap ─────────────────────────────────────────
+
+
+class AttachRequest(BaseModel):
+    """Request body for ``POST /adapters/attach``."""
+
+    ref: str = Field(..., description="hub://owner/name[:version] reference.")
+
+
+class DetachRequest(BaseModel):
+    """Request body for ``POST /adapters/detach``."""
+
+    adapter_id: str
+
+
+class ActiveAdapters(BaseModel):
+    active: list[str]
+
+
+class CacheStats(BaseModel):
+    """Snapshot of the adapter cache (manifests-only)."""
+
+    size: int
+    capacity: int
+
+
+class HubSearchResult(BaseModel):
+    """Single hit returned by the registry search."""
+
+    adapter_id: str
+    namespace: str | None = None
+    version: str | None = None
+    description: str | None = None
+    tags: list[str] = Field(default_factory=list)
 
 
 class CompileRequest(BaseModel):

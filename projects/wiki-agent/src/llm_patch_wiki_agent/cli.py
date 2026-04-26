@@ -2,13 +2,18 @@
 
 from __future__ import annotations
 
+import signal
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import click
-from llm_patch_shared import LlmPatchError
+from llm_patch_shared import DependencyError, LlmPatchError
 
 from llm_patch_wiki_agent import __version__
 from llm_patch_wiki_agent.agent import WikiAgent, WikiAgentConfig
+
+if TYPE_CHECKING:
+    pass
 
 
 def _build_agent(
@@ -198,6 +203,209 @@ def info(
             click.echo(f"Adapter IDs: {', '.join(summary.adapter_ids)}")
 
     _run_agent_action("info", _callback)
+
+
+# ── Phase 1: compile daemon ───────────────────────────────────────────
+
+
+@main.command(help="Run the wiki compile daemon (batch by default; --watch for live).")
+@click.option(
+    "--wiki-dir",
+    type=click.Path(exists=True, file_okay=False, path_type=Path),
+    required=True,
+    help="Directory containing the wiki markdown content.",
+)
+@click.option(
+    "--adapter-dir",
+    type=click.Path(file_okay=False, path_type=Path),
+    required=True,
+    help="Directory where compiled adapters and metadata sidecars are stored.",
+)
+@click.option(
+    "--checkpoint-dir",
+    type=click.Path(exists=True, file_okay=False, path_type=Path),
+    required=True,
+    help="Sakana Text-to-LoRA checkpoint directory.",
+)
+@click.option(
+    "--watch/--once",
+    default=False,
+    help="Keep running and compile on filesystem changes (default: --once).",
+)
+@click.option("--generator-device", default="cuda", show_default=True)
+@click.option("--pattern", "patterns", multiple=True, default=["*.md"])
+@click.option("--recursive/--no-recursive", default=True)
+@click.option("--aggregate-links/--no-aggregate-links", default=True)
+def daemon(
+    wiki_dir: Path,
+    adapter_dir: Path,
+    checkpoint_dir: Path,
+    watch: bool,
+    generator_device: str,
+    patterns: tuple[str, ...],
+    recursive: bool,
+    aggregate_links: bool,
+) -> None:
+    """Compile a wiki into adapters and write metadata sidecars."""
+    from llm_patch_wiki_agent.daemon import WikiCompileDaemon
+
+    def _callback() -> None:
+        config = WikiAgentConfig(
+            adapter_dir=adapter_dir,
+            wiki_dir=wiki_dir,
+            checkpoint_dir=checkpoint_dir,
+            source_patterns=patterns,
+            recursive=recursive,
+            aggregate_links=aggregate_links,
+            generator_device=generator_device,
+        )
+        wiki_daemon = WikiCompileDaemon.from_config(config)
+
+        if not watch:
+            result = wiki_daemon.run_once()
+            click.echo(f"Compiled {len(result.manifests)} adapter(s).")
+            for manifest, metadata in zip(result.manifests, result.metadata, strict=True):
+                click.echo(
+                    f"  {manifest.adapter_id}  context_id={metadata.context_id}  "
+                    f"→ {manifest.storage_uri}"
+                )
+            return
+
+        result = wiki_daemon.run_once()
+        click.echo(f"Initial pass: compiled {len(result.manifests)} adapter(s). Watching…")
+        wiki_daemon.start()
+
+        def _stop(_signum: int, _frame: object) -> None:
+            click.echo("Stopping daemon…")
+            wiki_daemon.stop()
+            raise SystemExit(0)
+
+        signal.signal(signal.SIGINT, _stop)
+        try:
+            signal.signal(signal.SIGTERM, _stop)
+        except ValueError:
+            # Windows: SIGTERM may be unavailable in some contexts.
+            pass
+        signal.pause() if hasattr(signal, "pause") else _block_forever()
+
+    _run_agent_action("daemon", _callback)
+
+
+def _block_forever() -> None:  # pragma: no cover - Windows-only fallback
+    import time
+
+    while True:
+        time.sleep(3600)
+
+
+# ── Phase 2: HTTP gateway ─────────────────────────────────────────────
+
+
+@main.command(help="Run the FastAPI inference gateway with metadata-based routing.")
+@click.option(
+    "--adapter-dir",
+    type=click.Path(exists=True, file_okay=False, path_type=Path),
+    required=True,
+)
+@click.option("--model-id", required=True, help="Base HuggingFace model ID or local path.")
+@click.option("--host", default="127.0.0.1", show_default=True)
+@click.option("--port", default=8765, show_default=True, type=int)
+@click.option("--device-map", default="auto", show_default=True)
+@click.option("--dtype", default="float16", show_default=True)
+@click.option("--reload/--no-reload", default=False)
+def serve(
+    adapter_dir: Path,
+    model_id: str,
+    host: str,
+    port: int,
+    device_map: str,
+    dtype: str,
+    reload: bool,
+) -> None:
+    """Launch the wiki-agent inference gateway (uvicorn)."""
+
+    def _callback() -> None:
+        try:
+            import uvicorn
+        except ImportError as exc:
+            raise DependencyError(
+                "uvicorn is not installed. Install with: pip install 'llm-patch-wiki-agent[server]'"
+            ) from exc
+
+        from llm_patch_wiki_agent.gateway import GatewayContext, create_app
+
+        config = WikiAgentConfig(
+            adapter_dir=adapter_dir,
+            model_id=model_id,
+            model_device_map=device_map,
+            model_dtype=dtype,
+        )
+        context = GatewayContext.from_config(config)
+        app = create_app(context)
+        click.echo(f"Serving wiki-agent gateway on http://{host}:{port}")
+        uvicorn.run(app, host=host, port=port, reload=reload)
+
+    _run_agent_action("serve", _callback)
+
+
+# ── Phase 3: MCP server ───────────────────────────────────────────────
+
+
+@main.command(help="Run the wiki-agent MCP server (exposes internalize_knowledge).")
+@click.option(
+    "--adapter-dir",
+    type=click.Path(file_okay=False, path_type=Path),
+    required=True,
+)
+@click.option(
+    "--wiki-dir",
+    type=click.Path(file_okay=False, path_type=Path),
+    default=None,
+)
+@click.option(
+    "--checkpoint-dir",
+    type=click.Path(file_okay=False, path_type=Path),
+    default=None,
+)
+@click.option("--model-id", default=None)
+@click.option(
+    "--transport",
+    type=click.Choice(["stdio", "sse"], case_sensitive=False),
+    default="stdio",
+    show_default=True,
+)
+def mcp(
+    adapter_dir: Path,
+    wiki_dir: Path | None,
+    checkpoint_dir: Path | None,
+    model_id: str | None,
+    transport: str,
+) -> None:
+    """Launch the wiki-agent MCP server."""
+
+    def _callback() -> None:
+        try:
+            import mcp  # noqa: F401
+        except ImportError as exc:
+            raise DependencyError(
+                "mcp is not installed. Install with: pip install 'llm-patch-wiki-agent[mcp]'"
+            ) from exc
+
+        from llm_patch_wiki_agent.gateway import GatewayContext
+        from llm_patch_wiki_agent.mcp_server import build_server
+
+        config = WikiAgentConfig(
+            adapter_dir=adapter_dir,
+            wiki_dir=wiki_dir,
+            checkpoint_dir=checkpoint_dir,
+            model_id=model_id,
+        )
+        context = GatewayContext.from_config(config)
+        server = build_server(context)
+        click.echo(f"Starting wiki-agent MCP server (transport={transport})…")
+        server.run(transport=transport)
+
+    _run_agent_action("mcp", _callback)
 
 
 if __name__ == "__main__":  # pragma: no cover

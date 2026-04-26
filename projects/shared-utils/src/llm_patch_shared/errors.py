@@ -26,3 +26,26 @@ class DependencyError(IntegrationError):
 
 class ResourceNotFoundError(IntegrationError):
     """Raised when a requested runtime resource cannot be found."""
+
+
+# ── Adapter Market / Registry errors ──────────────────────────────────
+
+
+class AdapterNotFoundError(ResourceNotFoundError):
+    """Raised when an adapter cannot be located in any repository or registry."""
+
+
+class ChecksumMismatchError(IntegrationError):
+    """Raised when a downloaded adapter fails checksum verification."""
+
+
+class IncompatibleBaseModelError(IntegrationError):
+    """Raised when an adapter's declared base model is incompatible with the active one."""
+
+
+class RegistryUnavailableError(IntegrationError):
+    """Raised when no adapter registry client is configured or reachable."""
+
+
+class CapacityExceededError(IntegrationError):
+    """Raised when a bounded resource (e.g. adapter cache) cannot accept more items."""

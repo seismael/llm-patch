@@ -18,6 +18,11 @@ dependencies = [
     "click>=8.0",
 ]
 
+[project.optional-dependencies]
+server = ["fastapi>=0.100", "uvicorn>=0.20"]
+mcp = ["mcp>=1.0"]
+all = ["fastapi>=0.100", "uvicorn>=0.20", "mcp>=1.0"]
+
 [project.scripts]
 llm-patch-wiki-agent = "llm_patch_wiki_agent.cli:main"
 

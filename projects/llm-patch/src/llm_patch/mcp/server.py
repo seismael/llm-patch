@@ -38,6 +38,50 @@ mcp = FastMCP("llm-patch")
 # Module-level WikiManager — initialized by ``configure()``.
 _wiki: WikiManager | None = None
 
+# Module-level Adapter Market handles — set via ``configure_hub()``.
+_registry: object | None = None  # IAdapterRegistryClient
+_controller: object | None = None  # IRuntimeAdapterController
+
+
+def configure_hub(
+    registry: object | None = None,
+    controller: object | None = None,
+) -> None:
+    """Wire optional Adapter Market dependencies into MCP tools.
+
+    Both arguments are :class:`~llm_patch.core.interfaces.IAdapterRegistryClient`
+    and :class:`~llm_patch.core.interfaces.IRuntimeAdapterController`
+    instances respectively. Each defaults to ``None``; tools that
+    require an unset dependency raise :class:`RegistryUnavailableError`.
+    """
+    global _registry, _controller
+    if registry is not None:
+        _registry = registry
+    if controller is not None:
+        _controller = controller
+
+
+def _require_registry() -> object:
+    from llm_patch_shared import RegistryUnavailableError
+
+    if _registry is None:
+        raise RegistryUnavailableError(
+            "No registry client configured. "
+            "Call llm_patch.mcp.server.configure_hub(registry=...) at startup."
+        )
+    return _registry
+
+
+def _require_controller() -> object:
+    from llm_patch_shared import RegistryUnavailableError
+
+    if _controller is None:
+        raise RegistryUnavailableError(
+            "No runtime adapter controller configured. "
+            "Call llm_patch.mcp.server.configure_hub(controller=...) at startup."
+        )
+    return _controller
+
 
 def configure(
     base_dir: str | Path,
@@ -268,6 +312,90 @@ def obsidian_status() -> str:
         f"- Graph edges: {graph_data.edge_count}",
     ]
     return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# Adapter Market tools (Distributed Knowledge Registry)
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool()
+def search_knowledge_hub(query: str, limit: int = 10) -> list[dict]:  # type: ignore[type-arg]
+    """Search the registry hub for adapters matching *query*.
+
+    Args:
+        query: Free-form text — frameworks, tags, descriptions.
+        limit: Maximum number of results.
+
+    Returns:
+        A list of manifest dicts (one per hit).
+
+    Raises:
+        RegistryUnavailableError: If no registry client is configured.
+    """
+    from llm_patch.core.interfaces import IAdapterRegistryClient
+
+    registry = _require_registry()
+    assert isinstance(registry, IAdapterRegistryClient)
+    return [m.model_dump(mode="json") for m in registry.search(query, limit=limit)]
+
+
+@mcp.tool()
+def pull_hub_adapter(ref: str) -> dict:  # type: ignore[type-arg]
+    """Download an adapter from the hub (no attach).
+
+    Args:
+        ref: ``hub://owner/name[:version]`` reference.
+    """
+    from llm_patch.core.interfaces import IAdapterRegistryClient
+    from llm_patch.core.models import AdapterRef
+
+    registry = _require_registry()
+    assert isinstance(registry, IAdapterRegistryClient)
+    parsed = AdapterRef.parse(ref)
+    return registry.pull(parsed).model_dump(mode="json")
+
+
+@mcp.tool()
+def load_hub_adapter(ref: str) -> dict:  # type: ignore[type-arg]
+    """Pull *ref* from the hub and attach it to the running model.
+
+    This is the canonical agent-facing hot-swap entry point.
+
+    Args:
+        ref: ``hub://owner/name[:version]`` reference.
+
+    Returns:
+        Manifest of the now-active adapter.
+    """
+    from llm_patch.core.interfaces import IRuntimeAdapterController
+    from llm_patch.core.models import AdapterRef
+
+    controller = _require_controller()
+    assert isinstance(controller, IRuntimeAdapterController)
+    parsed = AdapterRef.parse(ref)
+    return controller.attach(parsed).model_dump(mode="json")
+
+
+@mcp.tool()
+def unload_hub_adapter(adapter_id: str) -> dict:  # type: ignore[type-arg]
+    """Detach an active adapter by id."""
+    from llm_patch.core.interfaces import IRuntimeAdapterController
+
+    controller = _require_controller()
+    assert isinstance(controller, IRuntimeAdapterController)
+    controller.detach(adapter_id)
+    return {"detached": adapter_id, "active": controller.active()}
+
+
+@mcp.tool()
+def list_active_adapters() -> list[str]:
+    """Return the ids of all currently-attached adapters."""
+    from llm_patch.core.interfaces import IRuntimeAdapterController
+
+    controller = _require_controller()
+    assert isinstance(controller, IRuntimeAdapterController)
+    return controller.active()
 
 
 # ---------------------------------------------------------------------------

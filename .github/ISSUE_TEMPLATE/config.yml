@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Discussions
+    url: https://github.com/yondonfu/llm-patch/discussions
+    about: Questions, ideas, and show-and-tell.
+  - name: Community guide
+    url: https://github.com/yondonfu/llm-patch/blob/main/docs/COMMUNITY.md
+    about: Channels, plugin gallery, and roadmap labels.

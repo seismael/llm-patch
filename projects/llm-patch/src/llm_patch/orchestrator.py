@@ -16,8 +16,8 @@ from llm_patch.core.models import AdapterManifest, DocumentContext
 logger = logging.getLogger(__name__)
 
 _DEPRECATION_MESSAGE = (
-    "KnowledgeFusionOrchestrator is deprecated and will be removed in a future "
-    "major release. Use llm_patch.CompilePipeline instead."
+    "KnowledgeFusionOrchestrator is deprecated and scheduled for removal in "
+    "v2.0.0. Use llm_patch.CompilePipeline instead. See docs/ROADMAP.md."
 )
 
 

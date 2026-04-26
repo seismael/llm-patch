@@ -1,0 +1,67 @@
+# =============================================================================
+# llm-patch adapter publish (TEMPLATE — disabled by default)
+#
+# This workflow is a *template* shipped as part of the v0.2.0 "Adapter Market"
+# scaffolding. It is intentionally inert until you:
+#
+#   1. Implement (or import) an `IAdapterRegistryClient` for your hub.
+#   2. Provide a factory callable, e.g. `my_org_registry:build_registry`,
+#      that returns the client.
+#   3. Configure the secrets referenced below (HUB_TOKEN, etc.).
+#   4. Uncomment the `on:` and `jobs:` blocks.
+#
+# See:
+#   - docs/AGENTIC_AI_INTEGRATION.md
+#   - docs/REGISTRY_PROTOCOL.md
+#   - docs/adr/0006-distributed-adapter-registry.md
+# =============================================================================
+
+name: Publish llm-patch adapter (template)
+
+# on:
+#   push:
+#     tags:
+#       - "adapter-v*"
+#   workflow_dispatch:
+#     inputs:
+#       source_dir:
+#         description: "Path to source documents to compile"
+#         required: true
+#         default: "./docs"
+#       target_uri:
+#         description: "hub:// (or hf://, s3://) target URI"
+#         required: true
+
+on:
+  workflow_dispatch:
+
+jobs:
+  noop:
+    name: Template — does nothing
+    runs-on: ubuntu-latest
+    steps:
+      - name: This is a template
+        run: |
+          echo "llm-patch-publish.yml is a template. See header for activation steps."
+
+# -----------------------------------------------------------------------------
+# Reference job (uncomment after wiring secrets + LLM_PATCH_PLUGIN_REGISTRY):
+#
+#  publish:
+#    name: Compile & push adapter
+#    runs-on: ubuntu-latest
+#    steps:
+#      - uses: actions/checkout@v4
+#      - uses: astral-sh/setup-uv@v3
+#      - name: Sync workspace
+#        run: uv sync
+#      - name: Compile adapter
+#        env:
+#          LLM_PATCH_PLUGIN_REGISTRY: my_org_registry:build_registry
+#        run: uv run llm-patch compile ${{ inputs.source_dir }} --output ./out
+#      - name: Push adapter to hub
+#        env:
+#          LLM_PATCH_PLUGIN_REGISTRY: my_org_registry:build_registry
+#          HUB_TOKEN: ${{ secrets.HUB_TOKEN }}
+#        run: uv run llm-patch push ./out --target ${{ inputs.target_uri }} --json
+# -----------------------------------------------------------------------------

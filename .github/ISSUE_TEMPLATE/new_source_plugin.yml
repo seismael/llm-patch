@@ -1,0 +1,40 @@
+name: New source plugin (`IDataSource`)
+description: Propose or announce a new source plugin (Markdown variant, PDF, HTTP API, etc.).
+labels: ["type:plugin", "area:engine"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this template to propose a new `IDataSource` plugin or to
+        announce one you have already shipped. See
+        [docs/EXTENDING.md](../../docs/EXTENDING.md) for the contract.
+  - type: input
+    id: name
+    attributes:
+      label: Plugin name
+      placeholder: "obsidian-vault-source"
+    validations:
+      required: true
+  - type: input
+    id: package
+    attributes:
+      label: Package / repo URL
+  - type: textarea
+    id: motivation
+    attributes:
+      label: What format / surface does it ingest?
+    validations:
+      required: true
+  - type: textarea
+    id: contract
+    attributes:
+      label: Notes on the `IDataSource` contract
+      description: How does it implement `iter_documents` / `watch`?
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist
+      options:
+        - label: I have read [docs/EXTENDING.md](../../docs/EXTENDING.md).
+        - label: The plugin imports only from the public `llm_patch` API.
+        - label: A factory callable is exposed for `LLM_PATCH_PLUGIN_SOURCE` / entry point.

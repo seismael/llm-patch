@@ -169,6 +169,40 @@ class IAdapterRepository(abc.ABC):
 
 **Extension point:** Implement this interface for S3, Google Cloud Storage, Azure Blob, HuggingFace Hub, or any persistent storage backend.
 
+### Distribution Layer (v0.2.0+) — `IAdapterRegistryClient`, `IAdapterCache`, `IRuntimeAdapterController`
+
+Three additional engine ABCs cover the **Adapter Market** use case (see
+[AGENTIC_AI_INTEGRATION.md](AGENTIC_AI_INTEGRATION.md)):
+
+```python
+class IAdapterRegistryClient(abc.ABC):
+    def search(self, query: str, *, limit: int = 10) -> list[AdapterManifest]: ...
+    def resolve(self, ref: AdapterRef) -> AdapterManifest: ...
+    def pull(self, ref: AdapterRef) -> AdapterManifest: ...   # verifies SHA-256
+    def push(self, adapter_id: str, ref: AdapterRef) -> AdapterManifest: ...
+
+class IAdapterCache(abc.ABC):
+    @property
+    def capacity(self) -> int: ...
+    def get(self, adapter_id: str) -> AdapterManifest | None: ...
+    def put(self, manifest: AdapterManifest) -> None: ...
+    def evict(self, adapter_id: str) -> None: ...
+
+class IRuntimeAdapterController(abc.ABC):
+    def attach(self, ref: AdapterRef) -> AdapterManifest: ...
+    def detach(self, adapter_id: str) -> None: ...
+    def active(self) -> list[str]: ...
+```
+
+Reference impls shipped: `LRUAdapterCache` (stdlib `OrderedDict` + `RLock`)
+and `PeftRuntimeController` (wraps `IAdapterLoader` + `ModelHandle`,
+serialized via `threading.RLock`). The engine ships **no** concrete
+registry client; operators wire one via `LLM_PATCH_PLUGIN_REGISTRY=module:factory`
+or constructor injection (see [ADR-0006](adr/0006-distributed-adapter-registry.md)).
+
+Wire protocol: [REGISTRY_PROTOCOL.md](REGISTRY_PROTOCOL.md). Server
+concurrency model: [SERVER_ARCHITECTURE.md](SERVER_ARCHITECTURE.md).
+
 ---
 
 ## Domain Models

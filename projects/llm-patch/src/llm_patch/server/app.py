@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -10,15 +11,32 @@ from typing import cast
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
+from llm_patch_shared import (
+    AdapterNotFoundError,
+    ChecksumMismatchError,
+    IncompatibleBaseModelError,
+    RegistryUnavailableError,
+)
+
 import llm_patch
-from llm_patch.core.interfaces import IAdapterRepository, IAgentRuntime, IWeightGenerator
+from llm_patch.core.interfaces import (
+    IAdapterCache,
+    IAdapterRepository,
+    IAgentRuntime,
+    IRuntimeAdapterController,
+    IWeightGenerator,
+)
 from llm_patch.server.schemas import (
+    ActiveAdapters,
     AdapterInfo,
+    AttachRequest,
+    CacheStats,
     ChatMessageSchema,
     ChatRequest,
     ChatResponse,
     CompileRequest,
     CompileResponse,
+    DetachRequest,
     GenerateRequest,
     GenerateResponse,
     HealthResponse,
@@ -27,6 +45,11 @@ from llm_patch.server.schemas import (
 # ── Module-level state ────────────────────────────────────────────────
 
 _state: dict[str, object] = {}
+
+# Single global lock serializing GPU-affecting attach/detach/generate
+# operations. Concurrency contract is documented in
+# ``docs/SERVER_ARCHITECTURE.md``.
+_swap_lock = asyncio.Lock()
 
 
 def _get_repository() -> IAdapterRepository:
@@ -58,6 +81,42 @@ def _get_generator() -> IWeightGenerator | None:
     if generator is None:
         return None
     return cast(IWeightGenerator, generator)
+
+
+def _get_controller() -> IRuntimeAdapterController | None:
+    """Return the runtime adapter controller, or None if not configured."""
+    ctrl = _state.get("controller")
+    if ctrl is None:
+        return None
+    return cast(IRuntimeAdapterController, ctrl)
+
+
+def _get_cache() -> IAdapterCache | None:
+    """Return the in-memory adapter cache, or None if not configured."""
+    cache = _state.get("cache")
+    if cache is None:
+        return None
+    return cast(IAdapterCache, cache)
+
+
+def _manifest_to_info(m: object) -> AdapterInfo:
+    """Convert a domain :class:`AdapterManifest` to wire schema."""
+    # Imported lazily to avoid a circular type dependency on startup.
+    from llm_patch.core.models import AdapterManifest
+
+    assert isinstance(m, AdapterManifest)
+    return AdapterInfo(
+        adapter_id=m.adapter_id,
+        rank=m.rank,
+        target_modules=m.target_modules,
+        storage_uri=m.storage_uri,
+        namespace=m.namespace,
+        version=m.version,
+        checksum_sha256=m.checksum_sha256,
+        base_model_compatibility=list(m.base_model_compatibility),
+        tags=list(m.tags),
+        description=m.description,
+    )
 
 
 # ── Lifespan ──────────────────────────────────────────────────────────
@@ -115,15 +174,7 @@ async def health() -> HealthResponse:
 @app.get("/adapters", response_model=list[AdapterInfo])
 async def list_adapters() -> list[AdapterInfo]:
     repo = _get_repository()
-    return [
-        AdapterInfo(
-            adapter_id=m.adapter_id,
-            rank=m.rank,
-            target_modules=m.target_modules,
-            storage_uri=m.storage_uri,
-        )
-        for m in repo.list_adapters()
-    ]
+    return [_manifest_to_info(m) for m in repo.list_adapters()]
 
 
 @app.get("/adapters/{adapter_id}", response_model=AdapterInfo)
@@ -131,12 +182,7 @@ async def get_adapter(adapter_id: str) -> AdapterInfo:
     repo = _get_repository()
     for m in repo.list_adapters():
         if m.adapter_id == adapter_id:
-            return AdapterInfo(
-                adapter_id=m.adapter_id,
-                rank=m.rank,
-                target_modules=m.target_modules,
-                storage_uri=m.storage_uri,
-            )
+            return _manifest_to_info(m)
     raise HTTPException(status_code=404, detail=f"Adapter not found: {adapter_id}")
 
 
@@ -146,7 +192,79 @@ async def delete_adapter(adapter_id: str) -> dict[str, str]:
     if not repo.exists(adapter_id):
         raise HTTPException(status_code=404, detail=f"Adapter not found: {adapter_id}")
     repo.delete(adapter_id)
+    cache = _get_cache()
+    if cache is not None:
+        cache.evict(adapter_id)
     return {"deleted": adapter_id}
+
+
+# ── Hot-swap (Adapter Market) ─────────────────────────────────────────
+
+
+@app.post("/adapters/attach", response_model=AdapterInfo)
+async def attach_adapter(req: AttachRequest) -> AdapterInfo:
+    """Attach an adapter onto the live model handle.
+
+    Serialized via the global ``_swap_lock`` to honor PEFT's
+    single-writer GPU contract. See ``docs/SERVER_ARCHITECTURE.md``.
+    """
+    controller = _get_controller()
+    if controller is None:
+        raise HTTPException(
+            status_code=503,
+            detail="No runtime adapter controller configured.",
+        )
+    from llm_patch.core.models import AdapterRef
+
+    try:
+        ref = AdapterRef.parse(req.ref)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    async with _swap_lock:
+        try:
+            manifest = await asyncio.to_thread(controller.attach, ref)
+        except RegistryUnavailableError as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+        except AdapterNotFoundError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        except IncompatibleBaseModelError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        except ChecksumMismatchError as exc:
+            raise HTTPException(status_code=502, detail=str(exc)) from exc
+    cache = _get_cache()
+    if cache is not None:
+        cache.put(manifest)
+    return _manifest_to_info(manifest)
+
+
+@app.post("/adapters/detach")
+async def detach_adapter(req: DetachRequest) -> dict[str, str]:
+    controller = _get_controller()
+    if controller is None:
+        raise HTTPException(
+            status_code=503,
+            detail="No runtime adapter controller configured.",
+        )
+    async with _swap_lock:
+        await asyncio.to_thread(controller.detach, req.adapter_id)
+    return {"detached": req.adapter_id}
+
+
+@app.get("/adapters/active", response_model=ActiveAdapters)
+async def active_adapters() -> ActiveAdapters:
+    controller = _get_controller()
+    if controller is None:
+        return ActiveAdapters(active=[])
+    return ActiveAdapters(active=controller.active())
+
+
+@app.get("/cache/stats", response_model=CacheStats)
+async def cache_stats() -> CacheStats:
+    cache = _get_cache()
+    if cache is None:
+        return CacheStats(size=0, capacity=0)
+    return CacheStats(size=len(cache), capacity=cache.capacity)
 
 
 # ── Compile ───────────────────────────────────────────────────────────

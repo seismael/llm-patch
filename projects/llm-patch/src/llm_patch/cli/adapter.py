@@ -90,18 +90,42 @@ def adapter() -> None:
     """
 
 
+def _resolve_compile_paths(
+    source_dir: Path | None, output_dir: Path | None
+) -> tuple[Path, Path]:
+    """Resolve --source-dir/--output-dir, falling back to ``.llm-patch.toml``."""
+    from llm_patch.core.project_config import ProjectConfig
+
+    config = ProjectConfig.find_and_load()
+    src = source_dir or (config.compile.source if config else None)
+    out = output_dir or (config.compile.output if config else None)
+    if src is None:
+        raise click.ClickException(
+            "Missing --source-dir. Provide --source-dir or set [compile] source "
+            "in .llm-patch.toml (run `llm-patch init`)."
+        )
+    if out is None:
+        raise click.ClickException(
+            "Missing --output-dir. Provide --output-dir or set [compile] output "
+            "in .llm-patch.toml (run `llm-patch init`)."
+        )
+    if not src.exists() or not src.is_dir():
+        raise click.ClickException(f"--source-dir does not exist: {src}")
+    return src, out
+
+
 @adapter.command()
 @click.option(
     "--source-dir",
-    type=click.Path(exists=True, file_okay=False, path_type=Path),
-    required=True,
-    help="Directory containing source Markdown documents.",
+    type=click.Path(exists=False, file_okay=False, path_type=Path),
+    default=None,
+    help="Directory containing source Markdown documents (default: [compile].source from .llm-patch.toml).",
 )
 @click.option(
     "--output-dir",
     type=click.Path(file_okay=False, path_type=Path),
-    required=True,
-    help="Directory for storing generated adapter weights.",
+    default=None,
+    help="Directory for storing generated adapter weights (default: [compile].output from .llm-patch.toml).",
 )
 @click.option(
     "--checkpoint-dir",
@@ -113,17 +137,18 @@ def adapter() -> None:
 @click.option("--pattern", "patterns", multiple=True, default=["*.md"], help="File glob patterns.")
 @click.option("--recursive/--no-recursive", default=True, help="Recurse into subdirs.")
 def compile(
-    source_dir: Path,
-    output_dir: Path,
+    source_dir: Path | None,
+    output_dir: Path | None,
     checkpoint_dir: Path | None,
     device: str,
     patterns: tuple[str, ...],
     recursive: bool,
 ) -> None:
     """Batch compile all documents into adapter weights."""
-    output_dir.mkdir(parents=True, exist_ok=True)
+    src, out = _resolve_compile_paths(source_dir, output_dir)
+    out.mkdir(parents=True, exist_ok=True)
     orchestrator = _build_orchestrator(
-        source_dir, output_dir, checkpoint_dir, device, list(patterns), recursive
+        src, out, checkpoint_dir, device, list(patterns), recursive
     )
     manifests = orchestrator.compile_all()
     click.echo(f"Compiled {len(manifests)} adapter(s).")
@@ -134,15 +159,15 @@ def compile(
 @adapter.command()
 @click.option(
     "--source-dir",
-    type=click.Path(exists=True, file_okay=False, path_type=Path),
-    required=True,
-    help="Directory to watch for document changes.",
+    type=click.Path(exists=False, file_okay=False, path_type=Path),
+    default=None,
+    help="Directory to watch for document changes (default: [compile].source from .llm-patch.toml).",
 )
 @click.option(
     "--output-dir",
     type=click.Path(file_okay=False, path_type=Path),
-    required=True,
-    help="Directory for storing generated adapter weights.",
+    default=None,
+    help="Directory for storing generated adapter weights (default: [compile].output from .llm-patch.toml).",
 )
 @click.option(
     "--checkpoint-dir",
@@ -154,14 +179,17 @@ def compile(
 @click.option("--pattern", "patterns", multiple=True, default=["*.md"], help="File glob patterns.")
 @click.option("--recursive/--no-recursive", default=True, help="Recurse into subdirs.")
 def watch(
-    source_dir: Path,
-    output_dir: Path,
+    source_dir: Path | None,
+    output_dir: Path | None,
     checkpoint_dir: Path | None,
     device: str,
     patterns: tuple[str, ...],
     recursive: bool,
 ) -> None:
     """Watch a directory and compile adapters on change (Ctrl-C to stop)."""
+    src, out = _resolve_compile_paths(source_dir, output_dir)
+    source_dir = src
+    output_dir = out
     output_dir.mkdir(parents=True, exist_ok=True)
     orchestrator = _build_orchestrator(
         source_dir, output_dir, checkpoint_dir, device, list(patterns), recursive

@@ -6,7 +6,7 @@ import logging
 from collections.abc import Generator
 from typing import Any
 
-from llm_patch.core.interfaces import IAgentRuntime
+from llm_patch.core.interfaces import IAgentRuntime, IRuntimeAdapterController
 from llm_patch.core.models import (
     ChatMessage,
     ChatResponse,
@@ -24,26 +24,40 @@ class PeftAgentRuntime(IAgentRuntime):
     Args:
         handle: A ``ModelHandle`` (base or with adapters attached).
         options: Default generation knobs.
+        controller: Optional hot-swap hook. When provided, agent code
+            (e.g. via MCP tools) can attach/detach adapters at runtime
+            without reconstructing the runtime.
     """
 
     def __init__(
         self,
         handle: ModelHandle,
         options: GenerationOptions | None = None,
+        controller: IRuntimeAdapterController | None = None,
     ) -> None:
         self._handle = handle
         self._opts = options or GenerationOptions()
+        self._controller = controller
 
     @property
     def handle(self) -> ModelHandle:
+        # If a controller is mutating the handle, prefer its view.
+        if self._controller is not None and hasattr(self._controller, "handle"):
+            return self._controller.handle  # type: ignore[no-any-return]
         return self._handle
+
+    @property
+    def controller(self) -> IRuntimeAdapterController | None:
+        """Adapter hot-swap controller, or ``None`` if not configured."""
+        return self._controller
 
     def generate(self, prompt: str, **kwargs: Any) -> str:
         import torch
 
         opts = self._resolve_opts(kwargs)
-        model = self._handle.model
-        tokenizer = self._handle.tokenizer
+        handle = self.handle
+        model = handle.model
+        tokenizer = handle.tokenizer
 
         inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
         with torch.inference_mode():
@@ -80,8 +94,9 @@ class PeftAgentRuntime(IAgentRuntime):
         import torch
 
         opts = self._resolve_opts(kwargs)
-        model = self._handle.model
-        tokenizer = self._handle.tokenizer
+        handle = self.handle
+        model = handle.model
+        tokenizer = handle.tokenizer
 
         inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
         streamer = TextIteratorStreamer(tokenizer, skip_prompt=True, skip_special_tokens=True)
@@ -116,7 +131,7 @@ class PeftAgentRuntime(IAgentRuntime):
 
         Uses the tokenizer's chat template when available.
         """
-        tokenizer = self._handle.tokenizer
+        tokenizer = self.handle.tokenizer
         if hasattr(tokenizer, "apply_chat_template") and tokenizer.chat_template:
             dicts = [{"role": m.role.value, "content": m.content} for m in messages]
             return str(

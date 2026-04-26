@@ -1229,7 +1229,7 @@ wheels = [
 
 [[package]]
 name = "llm-patch"
-version = "0.1.0"
+version = "1.0.0rc1"
 source = { editable = "projects/llm-patch" }
 dependencies = [
     { name = "llm-patch-shared" },
@@ -1346,12 +1346,33 @@ dependencies = [
     { name = "llm-patch-shared" },
 ]
 
+[package.optional-dependencies]
+all = [
+    { name = "fastapi" },
+    { name = "mcp" },
+    { name = "uvicorn" },
+]
+mcp = [
+    { name = "mcp" },
+]
+server = [
+    { name = "fastapi" },
+    { name = "uvicorn" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "click", specifier = ">=8.0" },
+    { name = "fastapi", marker = "extra == 'all'", specifier = ">=0.100" },
+    { name = "fastapi", marker = "extra == 'server'", specifier = ">=0.100" },
     { name = "llm-patch", editable = "projects/llm-patch" },
     { name = "llm-patch-shared", editable = "projects/shared-utils" },
+    { name = "mcp", marker = "extra == 'all'", specifier = ">=1.0" },
+    { name = "mcp", marker = "extra == 'mcp'", specifier = ">=1.0" },
+    { name = "uvicorn", marker = "extra == 'all'", specifier = ">=0.20" },
+    { name = "uvicorn", marker = "extra == 'server'", specifier = ">=0.20" },
 ]
+provides-extras = ["server", "mcp", "all"]
 
 [[package]]
 name = "llm-patch-workspace"

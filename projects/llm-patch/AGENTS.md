@@ -35,11 +35,16 @@ When adding new public symbols:
 
 ## Do
 
-- Maintain the existing 7 ABCs in `core/interfaces.py` as the single
-  extension surface; new variation goes through new interfaces or
-  Strategy implementations, not by editing existing ones (OCP).
-- Preserve test baseline: `216 passed, 3 skipped`. Any change that
-  alters that count must be justified in the PR description.
+- Maintain the existing 7 ABCs in `core/interfaces.py` plus the three
+  v0.2.0 distribution ABCs (`IAdapterRegistryClient`, `IAdapterCache`,
+  `IRuntimeAdapterController`) as the single extension surface; new
+  variation goes through new interfaces or Strategy implementations,
+  not by editing existing ones (OCP).
+- Preserve test baseline: `379 passed, 12 skipped` plus the new
+  adapter-market unit tests (`tests/unit/test_adapter_manifest_v2.py`,
+  `test_lru_cache.py`, `test_runtime_controller.py`,
+  `test_cli_distribute.py`, `test_preflight.py`). Any change that
+  alters those counts must be justified in the PR description.
 - Add new sources / generators / storages / providers / runtimes by
   implementing the corresponding ABC, never by extending an unrelated
   one.
@@ -55,5 +60,5 @@ When adding new public symbols:
 
 ```pwsh
 uv run --package llm-patch pytest -q
-# expect: 216 passed, 3 skipped
+# expect: ≥ 379 passed, 12 skipped (plus the adapter-market unit tests)
 ```

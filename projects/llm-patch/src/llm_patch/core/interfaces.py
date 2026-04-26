@@ -26,6 +26,7 @@ if TYPE_CHECKING:
 
     from llm_patch.core.models import (
         AdapterManifest,
+        AdapterRef,
         ChatMessage,
         ChatResponse,
         DocumentContext,
@@ -243,3 +244,104 @@ class IAgentRuntime(abc.ABC):
         Default falls back to non-streaming ``generate``.
         """
         yield self.generate(prompt, **kwargs)
+
+
+# ── Distributed Adapter Registry (Adapter Market) ─────────────────────
+
+
+class IAdapterRegistryClient(abc.ABC):
+    """Client for a remote adapter registry / "Adapter Market" hub.
+
+    Conceptually a Repository over the network: it resolves
+    :class:`~llm_patch.core.models.AdapterRef` URIs to manifests,
+    downloads weights into a local :class:`IAdapterRepository`, and
+    publishes locally-stored adapters back to a remote hub.
+
+    Implementations are NOT shipped by the engine. Concrete HTTP / S3 /
+    OCI clients live behind optional extras (see ``docs/REGISTRY_PROTOCOL.md``).
+    """
+
+    @abc.abstractmethod
+    def search(self, query: str, *, limit: int = 10) -> list[AdapterManifest]:
+        """Return manifests matching *query*, ordered by relevance.
+
+        Args:
+            query: Free-form text — framework names, tags, descriptions.
+            limit: Maximum number of results.
+        """
+
+    @abc.abstractmethod
+    def resolve(self, ref: AdapterRef) -> AdapterManifest:
+        """Resolve a reference to its manifest without downloading weights."""
+
+    @abc.abstractmethod
+    def pull(self, ref: AdapterRef) -> AdapterManifest:
+        """Download adapter weights into the local repository.
+
+        Implementations MUST verify ``manifest.checksum_sha256`` and
+        raise :class:`llm_patch_shared.ChecksumMismatchError` on
+        mismatch. Returns the verified, locally-stored manifest.
+        """
+
+    @abc.abstractmethod
+    def push(self, adapter_id: str, ref: AdapterRef) -> AdapterManifest:
+        """Upload a locally-stored adapter to the registry under *ref*."""
+
+
+# ── Adapter Cache (LRU Decorator) ─────────────────────────────────────
+
+
+class IAdapterCache(abc.ABC):
+    """Bounded cache of :class:`AdapterManifest` entries.
+
+    Decorator over :class:`IAdapterRepository`: holds at most
+    :attr:`capacity` recently-used manifests in memory. Eviction is
+    LRU. The cache stores manifests only — adapter weights remain
+    materialized through the underlying repository.
+    """
+
+    @property
+    @abc.abstractmethod
+    def capacity(self) -> int:
+        """Maximum number of manifests retained."""
+
+    @abc.abstractmethod
+    def get(self, adapter_id: str) -> AdapterManifest | None:
+        """Return the manifest for *adapter_id*, or ``None`` if absent."""
+
+    @abc.abstractmethod
+    def put(self, manifest: AdapterManifest) -> None:
+        """Insert *manifest*, evicting the LRU entry if at capacity."""
+
+    @abc.abstractmethod
+    def evict(self, adapter_id: str) -> None:
+        """Remove *adapter_id* from the cache (no-op if absent)."""
+
+    @abc.abstractmethod
+    def __len__(self) -> int:
+        """Current number of cached manifests."""
+
+
+# ── Runtime Adapter Controller (hot-swap) ─────────────────────────────
+
+
+class IRuntimeAdapterController(abc.ABC):
+    """Mutates a live :class:`ModelHandle` by attaching/detaching adapters.
+
+    Sits between :class:`IAgentRuntime` and :class:`IAdapterLoader`.
+    Implementations MUST serialize concurrent attach/detach calls
+    (typically via an ``RLock`` or ``asyncio.Lock``) because PEFT
+    state is not thread-safe.
+    """
+
+    @abc.abstractmethod
+    def attach(self, ref: AdapterRef) -> AdapterManifest:
+        """Attach the adapter named by *ref* onto the active handle."""
+
+    @abc.abstractmethod
+    def detach(self, adapter_id: str) -> None:
+        """Detach the adapter with *adapter_id* (no-op if not active)."""
+
+    @abc.abstractmethod
+    def active(self) -> list[str]:
+        """List ``adapter_id`` values currently attached, in attach-order."""

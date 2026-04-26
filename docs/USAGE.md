@@ -1,12 +1,16 @@
 # Usage Guide
 
-This guide covers how to install, configure, and use **llm-patch** — a framework that converts text documents into LoRA adapter weights, attaches them to HuggingFace models, and serves the patched model for inference.
+This guide covers how to install, configure, and use **llm-patch** — a CLI-first toolkit (with a stable Python API underneath) that converts text into LoRA adapter weights, attaches them to HuggingFace models, and serves the patched model.
+
+> **New here?** Start with the 5-minute walkthrough in [docs/QUICKSTART.md](QUICKSTART.md). This document is the long-form reference.
 
 ---
 
 ## Table of Contents
 
 - [Installation](#installation)
+- [CLI Reference](#cli-reference)
+- [Publishing & consuming adapters](#publishing--consuming-adapters)
 - [Architecture Overview](#architecture-overview)
 - [Quick Start (No GPU)](#quick-start-no-gpu)
 - [Data Sources](#data-sources)
@@ -14,11 +18,13 @@ This guide covers how to install, configure, and use **llm-patch** — a framewo
 - [Attach & Runtime](#attach--runtime)
 - [Wiki Pipeline](#wiki-pipeline)
 - [HTTP API Server](#http-api-server)
-- [CLI Reference](#cli-reference)
 - [Configuration](#configuration)
 - [Using the Makefile](#using-the-makefile)
 - [Running Tests](#running-tests)
 - [Troubleshooting](#troubleshooting)
+- [Python API (advanced)](#python-api-advanced)
+
+> The CLI is the recommended surface. The Python API examples in the second half of this document target plugin authors and library integrators — not first-time users.
 
 ---
 
@@ -527,6 +533,65 @@ llm-patch model chat --model-id google/gemma-2-2b-it --adapter-dir ./adapters
 
 ```bash
 llm-patch serve --host 0.0.0.0 --port 8000 --adapter-dir ./adapters
+```
+
+---
+
+## Publishing & consuming adapters
+
+> Available from `llm-patch` v0.2.0. Full design context: [AGENTIC_AI_INTEGRATION.md](AGENTIC_AI_INTEGRATION.md), [REGISTRY_PROTOCOL.md](REGISTRY_PROTOCOL.md).
+
+The engine ships the **interface** for distributing adapters across
+hubs but no concrete network client. Operators wire one with the
+`LLM_PATCH_PLUGIN_REGISTRY` environment variable, pointing to a `module:factory`
+that returns an `IAdapterRegistryClient` instance.
+
+```pwsh
+# Tell llm-patch which registry implementation to use
+$Env:LLM_PATCH_PLUGIN_REGISTRY = "my_org_registry:build_registry"
+
+# Search the hub
+llm-patch hub search "react" --limit 5
+llm-patch hub search "react" --json   # machine-readable
+
+# Pull an adapter (verifies SHA-256 from manifest)
+llm-patch pull hub://acme/react-19:1.2.0
+
+# Push a locally compiled adapter
+llm-patch push ./out/my-adapter --target hub://acme/my-adapter:0.1.0
+```
+
+`hf://owner/repo` and `s3://bucket/key` are reserved schemes — they are
+recognized by the CLI but dispatched to whichever
+`IAdapterRegistryClient` understands that scheme. If no client is
+registered, the command exits cleanly with a `RegistryUnavailableError`
+message and a link to [REGISTRY_PROTOCOL.md](REGISTRY_PROTOCOL.md).
+
+### GitHub Actions (template — deferred)
+
+A reference workflow `.github/workflows/llm-patch-publish.yml` will be
+added as a commented-out template. Real publishing logic is disabled
+by default; users wire credentials and uncomment as needed.
+
+```yaml
+# .github/workflows/llm-patch-publish.yml (planned)
+name: Publish llm-patch adapter
+on:
+  push:
+    tags: ["adapter-v*"]
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+      - run: uv sync
+      - env:
+          LLM_PATCH_PLUGIN_REGISTRY: my_org_registry:build_registry
+          HUB_TOKEN: ${{ secrets.HUB_TOKEN }}
+        run: |
+          uv run llm-patch compile ./docs --output ./out
+          uv run llm-patch push ./out --target hub://acme/docs:${{ github.ref_name }}
 ```
 
 ---
