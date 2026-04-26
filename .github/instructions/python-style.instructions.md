@@ -40,7 +40,7 @@ from [SPEC.md](../../SPEC.md). Where this file and `SPEC.md` disagree,
 
 ## Errors
 
-- Derive new exception types from `llm_patch_shared.errors.LlmPatchError`
+- Derive new exception types from `llm_patch_utils.errors.LlmPatchError`
   (or one of its subclasses). Never raise bare `Exception`.
 - Catch the narrowest exception possible. Don't swallow exceptions
   silently — log or re-raise.

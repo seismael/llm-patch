@@ -9,7 +9,7 @@ resolution-markers = [
 [manifest]
 members = [
     "llm-patch",
-    "llm-patch-shared",
+    "llm-patch-utils",
     "llm-patch-wiki-agent",
     "llm-patch-workspace",
 ]
@@ -1232,7 +1232,7 @@ name = "llm-patch"
 version = "1.0.0rc1"
 source = { editable = "projects/llm-patch" }
 dependencies = [
-    { name = "llm-patch-shared" },
+    { name = "llm-patch-utils" },
     { name = "peft" },
     { name = "pydantic" },
     { name = "safetensors" },
@@ -1302,7 +1302,7 @@ requires-dist = [
     { name = "httpx", marker = "extra == 'http'", specifier = ">=0.24" },
     { name = "litellm", marker = "extra == 'all'", specifier = ">=1.0" },
     { name = "litellm", marker = "extra == 'llm'", specifier = ">=1.0" },
-    { name = "llm-patch-shared", editable = "projects/shared-utils" },
+    { name = "llm-patch-utils", editable = "projects/utils" },
     { name = "mcp", marker = "extra == 'all'", specifier = ">=1.0" },
     { name = "mcp", marker = "extra == 'mcp'", specifier = ">=1.0" },
     { name = "peft", specifier = ">=0.12" },
@@ -1332,9 +1332,9 @@ dev = [
 ]
 
 [[package]]
-name = "llm-patch-shared"
-version = "0.1.0"
-source = { editable = "projects/shared-utils" }
+name = "llm-patch-utils"
+version = "0.2.0"
+source = { editable = "projects/utils" }
 
 [[package]]
 name = "llm-patch-wiki-agent"
@@ -1343,7 +1343,7 @@ source = { editable = "projects/wiki-agent" }
 dependencies = [
     { name = "click" },
     { name = "llm-patch" },
-    { name = "llm-patch-shared" },
+    { name = "llm-patch-utils" },
 ]
 
 [package.optional-dependencies]
@@ -1366,7 +1366,7 @@ requires-dist = [
     { name = "fastapi", marker = "extra == 'all'", specifier = ">=0.100" },
     { name = "fastapi", marker = "extra == 'server'", specifier = ">=0.100" },
     { name = "llm-patch", editable = "projects/llm-patch" },
-    { name = "llm-patch-shared", editable = "projects/shared-utils" },
+    { name = "llm-patch-utils", editable = "projects/utils" },
     { name = "mcp", marker = "extra == 'all'", specifier = ">=1.0" },
     { name = "mcp", marker = "extra == 'mcp'", specifier = ">=1.0" },
     { name = "uvicorn", marker = "extra == 'all'", specifier = ">=0.20" },

@@ -17,7 +17,7 @@ from collections import OrderedDict
 
 from llm_patch.core.interfaces import IAdapterCache
 from llm_patch.core.models import AdapterManifest
-from llm_patch_shared import CapacityExceededError
+from llm_patch_utils import CapacityExceededError
 
 __all__ = ["LRUAdapterCache"]
 

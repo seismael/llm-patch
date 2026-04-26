@@ -6,7 +6,7 @@ from pathlib import Path
 
 import llm_patch as engine
 import pytest
-from llm_patch_shared import ConfigurationError, IntegrationError
+from llm_patch_utils import ConfigurationError, IntegrationError
 
 from llm_patch_wiki_agent.daemon import WikiCompileDaemon
 from llm_patch_wiki_agent.registry import SidecarMetadataRegistry

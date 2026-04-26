@@ -10,7 +10,7 @@ attaches them to a base LLM, and serves a domain-expert chat agent.
 > (`NOTES.md`) — a continuous compile daemon, an HTTP inference gateway
 > with metadata-based routing, and an MCP server exposing
 > `internalize_knowledge`. All three are wiki-agent-specific glue;
-> the engine and shared-utils stay generic and untouched.
+> the engine and utils stay generic and untouched.
 
 ## Prerequisites
 

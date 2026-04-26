@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import llm_patch as engine
-from llm_patch_shared import ConfigurationError, DependencyError
+from llm_patch_utils import ConfigurationError, DependencyError
 
 from llm_patch_wiki_agent.daemon.runner import _derive_metadata
 

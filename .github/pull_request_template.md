@@ -1,6 +1,6 @@
 <!--
 Thanks for contributing! Please confirm the items below before requesting review.
-See SPEC.md and the per-project AGENTS.md for the full rules.
+See SPEC.md and the root AGENTS.md for the full rules.
 -->
 
 ## What & Why
@@ -10,13 +10,13 @@ See SPEC.md and the per-project AGENTS.md for the full rules.
 ## Affected Project(s)
 
 - [ ] `llm-patch` (engine)
-- [ ] `llm-patch-shared`
+- [ ] `llm-patch-utils`
 - [ ] `llm-patch-wiki-agent`
 - [ ] tooling / docs / CI only
 
 ## Checklist
 
-- [ ] Read the relevant `AGENTS.md` (root + per-project).
+- [ ] Read the root [AGENTS.md](../AGENTS.md) and the relevant `.github/instructions/*.instructions.md`.
 - [ ] Tests added/updated; **engine baseline preserved** (or change justified below).
 - [ ] `make check` passes locally (`lint + typecheck + check-layering + test`).
 - [ ] Public API change? → updated `__init__.py` `__all__`, `CHANGELOG.md`, and bumped version per SemVer.

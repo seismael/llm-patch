@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from llm_patch_shared import DependencyError, IntegrationError
+from llm_patch_utils import DependencyError, IntegrationError
 
 from llm_patch.core.interfaces import IModelProvider
 from llm_patch.core.models import ModelHandle

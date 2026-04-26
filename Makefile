@@ -1,4 +1,4 @@
-.PHONY: help sync test test-engine test-shared test-wiki-agent lint typecheck check check-layering check-coverage build clean adr
+.PHONY: help sync test test-engine test-utils test-wiki-agent lint typecheck check check-layering check-coverage build clean adr
 
 # ─────────────────────────────────────────────────────────────
 #  llm-patch monorepo — workspace fan-out commands
@@ -22,13 +22,13 @@ sync: ## Sync the entire workspace
 test-engine: ## Run engine tests
 	cd projects/llm-patch && $(UV) run pytest -q
 
-test-shared: ## Run shared-utils smoke tests
-	cd projects/shared-utils && $(UV) run pytest -q
+test-utils: ## Run utils smoke tests
+	cd projects/utils && $(UV) run pytest -q
 
 test-wiki-agent: ## Run wiki-agent smoke tests
 	cd projects/wiki-agent && $(UV) run pytest -q
 
-test: test-engine test-shared test-wiki-agent ## Run tests for every workspace member
+test: test-engine test-utils test-wiki-agent ## Run tests for every workspace member
 
 # ── Quality ─────────────────────────────────────────────────
 
@@ -37,7 +37,7 @@ lint: ## Lint the entire workspace
 
 typecheck: ## Mypy strict for every project
 	cd projects/llm-patch && $(UV) run mypy src
-	cd projects/shared-utils && $(UV) run mypy src
+	cd projects/utils && $(UV) run mypy src
 	cd projects/wiki-agent && $(UV) run mypy src
 
 check-layering: ## Architectural fitness check (ADR-0002)
@@ -53,7 +53,7 @@ check: lint typecheck check-layering test check-coverage ## Lint + typecheck + l
 
 build: ## Build distributions for every project
 	cd projects/llm-patch && $(UV) build
-	cd projects/shared-utils && $(UV) build
+	cd projects/utils && $(UV) build
 	cd projects/wiki-agent && $(UV) build
 
 # ── ADR helper ──────────────────────────────────────────────

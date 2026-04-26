@@ -235,7 +235,7 @@ def test_runtime_for_requires_model_id(tmp_path: Path) -> None:
         use_pipeline=cast(Any, _FakeUsePipeline()),
     )
 
-    from llm_patch_shared import ConfigurationError
+    from llm_patch_utils import ConfigurationError
 
     with pytest.raises(ConfigurationError):
         context.runtime_for("a1")

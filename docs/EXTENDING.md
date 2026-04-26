@@ -56,7 +56,7 @@ def build_registry() -> HttpRegistry:
 Tips:
 
 * Keep the constructor side-effect-free.
-* Raise the engine's typed errors (`from llm_patch_shared.errors import …`)
+* Raise the engine's typed errors (`from llm_patch_utils.errors import …`)
   so the CLI can render them consistently.
 
 ---

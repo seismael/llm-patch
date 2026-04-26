@@ -193,7 +193,7 @@ class TestRegistryEnvAlias:
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         from llm_patch.cli.distribute import _resolve_registry_spec
-        from llm_patch_shared import RegistryUnavailableError
+        from llm_patch_utils import RegistryUnavailableError
 
         monkeypatch.delenv("LLM_PATCH_PLUGIN_REGISTRY", raising=False)
         monkeypatch.delenv("LLM_PATCH_REGISTRY", raising=False)

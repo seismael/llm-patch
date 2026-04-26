@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any
 
 import torch
-from llm_patch_shared import ConfigurationError, DependencyError, IntegrationError
+from llm_patch_utils import ConfigurationError, DependencyError, IntegrationError
 
 from llm_patch.core.config import GeneratorConfig
 from llm_patch.core.interfaces import IWeightGenerator

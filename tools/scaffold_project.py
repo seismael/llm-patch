@@ -1,20 +1,19 @@
 """Scaffold a new project under ``projects/<name>/``.
 
-Materializes the standardized layout described in ``SPEC.md §9``:
+Materializes the standardized layout described in ``SPEC.md §1.1
+Project Shape``:
 
     projects/<name>/
         src/<package>/__init__.py
         src/<package>/py.typed
-        tests/unit/test_smoke.py
-        tests/integration/__init__.py
-        docs/.gitkeep
-        data/.gitkeep
-        artifacts/.gitkeep
-        examples/.gitkeep
+        tests/test_smoke.py
         pyproject.toml
-        AGENTS.md
         README.md
         CHANGELOG.md
+
+No per-project ``AGENTS.md`` is emitted: agent rules live in the single
+root ``AGENTS.md`` and in scoped ``.github/instructions/*.instructions.md``
+files (see ADR-0009).
 
 The new project is automatically picked up by the workspace because
 ``pyproject.toml`` declares ``members = ["projects/*"]``.
@@ -66,7 +65,7 @@ def scaffold(project_name: str, package: str) -> int:
         requires-python = ">=3.11"
         dependencies = [
             "llm-patch",
-            "llm-patch-shared",
+            "llm-patch-utils",
         ]
 
         [build-system]
@@ -92,8 +91,8 @@ def scaffold(project_name: str, package: str) -> int:
         dedent(f'''\
         """{package} — TODO: one-line summary.
 
-        See AGENTS.md for the per-project contract and the root SPEC.md for
-        the governing engineering specification.
+        See the root SPEC.md for the governing engineering specification
+        and the root AGENTS.md for the agent contract.
         """
 
         __version__ = "0.1.0"
@@ -104,7 +103,7 @@ def scaffold(project_name: str, package: str) -> int:
     _write(project_dir / "src" / package / "py.typed", "")
 
     _write(
-        project_dir / "tests" / "unit" / "test_smoke.py",
+        project_dir / "tests" / "test_smoke.py",
         dedent(f"""\
         \"\"\"Smoke test — verifies the package imports.\"\"\"
 
@@ -117,10 +116,6 @@ def scaffold(project_name: str, package: str) -> int:
             assert isinstance({package}.__version__, str)
     """),
     )
-    _write(project_dir / "tests" / "integration" / "__init__.py", "")
-
-    for sub in ("docs", "data", "artifacts", "examples"):
-        _write(project_dir / sub / ".gitkeep", "")
 
     _write(
         project_dir / "README.md",
@@ -129,38 +124,8 @@ def scaffold(project_name: str, package: str) -> int:
 
         TODO: describe this use-case and how it composes the engine.
 
-        See the root [SPEC.md](../../SPEC.md) and per-project
-        [AGENTS.md](AGENTS.md).
-    """),
-    )
-
-    _write(
-        project_dir / "AGENTS.md",
-        dedent(f"""\
-        # AGENTS — `{project_name}`
-
-        Per-project agent contract. Read with the root
-        [SPEC.md](../../SPEC.md) and [AGENTS.md](../../AGENTS.md).
-
-        ## Goal
-
-        TODO.
-
-        ## Public API
-
-        TODO — symbols re-exported from `{package}.__init__`.
-
-        ## Allowed Dependencies
-
-        - `llm-patch` (workspace, public API only).
-        - `llm-patch-shared` (workspace).
-        - Anything else requires an ADR.
-
-        ## Test
-
-        ```pwsh
-        uv run --package {project_name} pytest -q
-        ```
+        See the root [SPEC.md](../../SPEC.md) and the root
+        [AGENTS.md](../../AGENTS.md).
     """),
     )
 

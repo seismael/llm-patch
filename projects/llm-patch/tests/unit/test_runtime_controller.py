@@ -19,7 +19,7 @@ from llm_patch.core.interfaces import (
     IAdapterRegistryClient,
     IAdapterRepository,
 )
-from llm_patch_shared import (
+from llm_patch_utils import (
     AdapterNotFoundError,
     IncompatibleBaseModelError,
     RegistryUnavailableError,

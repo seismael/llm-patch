@@ -14,7 +14,7 @@ classifiers = [
 ]
 dependencies = [
     "llm-patch",
-    "llm-patch-shared",
+    "llm-patch-utils",
     "click>=8.0",
 ]
 

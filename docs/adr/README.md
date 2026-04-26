@@ -23,6 +23,8 @@ and the alternatives that were considered.
 | [0002](0002-layered-architecture.md) | Three-layer architecture (use-cases → engine → shared) | Accepted |
 | [0003](0003-public-api-policy.md) | Public API = top-level `__init__.py` re-exports only | Accepted |
 | [0004](0004-testing-strategy.md) | TDD for new public API; coverage thresholds | Accepted |
-| [0005](0005-engine-shared-errors.md) | Engine dependency on shared-utils for error types | Accepted |
+| [0005](0005-engine-shared-errors.md) | Engine dependency on utils for error types | Accepted |
 | [0006](0006-distributed-adapter-registry.md) | Distributed adapter registry & runtime boundaries | Accepted |
 | [0007](0007-adapter-manifest-v2.md) | Adapter identity & manifest v2 | Accepted |
+| [0008](0008-plugin-discovery.md) | Plugin discovery via env vars + entry points | Accepted |
+| [0009](0009-monorepo-structural-unification.md) | Monorepo structural unification (utils rename, single AGENTS.md, use-case template) | Accepted |

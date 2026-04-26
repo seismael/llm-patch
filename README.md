@@ -73,7 +73,7 @@ This repository is a **uv workspace monorepo**. The structure is:
 ```
 projects/
   llm-patch/         engine — generic Ingest → Compile → Attach → Use framework
-  shared-utils/      cross-project, stdlib-only utilities (llm_patch_shared)
+  utils/             cross-project, stdlib-only utilities (llm_patch_utils)
   wiki-agent/        first downstream use-case (llm_patch_wiki_agent)
 docs/
   adr/               Architecture Decision Records (MADR format)
@@ -89,10 +89,10 @@ AGENTS.md            root agent contract
 | Project | Description | Test command |
 |---|---|---|
 | [`projects/llm-patch`](projects/llm-patch) | The generic engine. | `uv run --package llm-patch pytest` |
-| [`projects/shared-utils`](projects/shared-utils) | Cross-project utilities (stdlib-only). | `uv run --package llm-patch-shared pytest` |
+| [`projects/utils`](projects/utils) | Cross-project utilities (stdlib-only). | `uv run --package llm-patch-utils pytest` |
 | [`projects/wiki-agent`](projects/wiki-agent) | Wiki-specialized agent with `compile`, one-shot `chat`, and `info` commands built on the engine. | `uv run --package llm-patch-wiki-agent pytest` |
 
-Dependencies flow **one-way**: use-cases → engine → shared-utils.
+Dependencies flow **one-way**: use-cases → engine → utils.
 Enforced by [tools/check_layering.py](tools/check_layering.py).
 
 ### Authoritative Documents
@@ -100,7 +100,8 @@ Enforced by [tools/check_layering.py](tools/check_layering.py).
 - [SPEC.md](SPEC.md) — binding engineering specification (SOLID, GoF, TDD, layering).
 - [AGENTS.md](AGENTS.md) — root agent contract and pre-change checklist.
 - [docs/adr/README.md](docs/adr/README.md) — Architecture Decision Records.
-- Per-project `AGENTS.md` files under each `projects/<name>/` directory.
+- Scoped agent rules under `.github/instructions/*.instructions.md`
+  (applied automatically via `applyTo` globs; see ADR-0009).
 
 ### Adding a New Use-Case Project
 
@@ -108,9 +109,10 @@ Enforced by [tools/check_layering.py](tools/check_layering.py).
 uv run python tools/scaffold_project.py <name>
 ```
 
-This materializes the standardized layout (src/, tests/{unit,integration}/,
-docs/, data/, artifacts/, examples/, pyproject.toml, AGENTS.md, README.md,
-CHANGELOG.md). The project is automatically picked up by the workspace.
+This materializes the standardized layout (`src/`, `tests/`,
+`pyproject.toml`, `README.md`, `CHANGELOG.md`). The project is
+automatically picked up by the workspace. No per-project `AGENTS.md`
+is emitted — the single root `AGENTS.md` governs all projects.
 
 ---
 

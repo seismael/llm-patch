@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import click
-from llm_patch_shared import DependencyError, LlmPatchError
+from llm_patch_utils import DependencyError, LlmPatchError
 
 from llm_patch_wiki_agent import __version__
 from llm_patch_wiki_agent.agent import WikiAgent, WikiAgentConfig

@@ -18,7 +18,7 @@ import logging
 import threading
 from typing import TYPE_CHECKING
 
-from llm_patch_shared import (
+from llm_patch_utils import (
     AdapterNotFoundError,
     IncompatibleBaseModelError,
     RegistryUnavailableError,

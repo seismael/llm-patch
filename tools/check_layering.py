@@ -4,12 +4,12 @@ Scans every project under ``projects/<name>/src`` and verifies that no
 ``.py`` file contains an import that violates the workspace's layering
 rules defined in ``SPEC.md`` and ADR-0002:
 
-    use-cases  ───►  engine  ───►  shared-utils
+    use-cases  ───►  engine  ───►  utils
 
 Forbidden imports (any of the following → exit code 1):
 
 * Engine importing from any use-case package.
-* ``llm-patch-shared`` importing from the engine or any use-case.
+* ``llm-patch-utils`` importing from the engine or any use-case.
 * A use-case importing from another use-case.
 * A use-case importing from a non-public engine module
   (i.e., anything other than ``llm_patch`` itself).
@@ -31,13 +31,13 @@ PROJECTS_DIR = ROOT / "projects"
 # Map: project directory name -> import-name of the package it owns.
 PROJECT_PACKAGE: dict[str, str] = {
     "llm-patch": "llm_patch",
-    "shared-utils": "llm_patch_shared",
+    "utils": "llm_patch_utils",
     "wiki-agent": "llm_patch_wiki_agent",
 }
 
-# Map: package import-name -> layer (1=shared, 2=engine, 3=use-case).
+# Map: package import-name -> layer (1=utils, 2=engine, 3=use-case).
 LAYER: dict[str, int] = {
-    "llm_patch_shared": 1,
+    "llm_patch_utils": 1,
     "llm_patch": 2,
     "llm_patch_wiki_agent": 3,
 }

@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-from llm_patch_shared import ConfigurationError, ResourceNotFoundError
+from llm_patch_utils import ConfigurationError, ResourceNotFoundError
 
 from llm_patch_wiki_agent.registry import AdapterMetadata, SidecarMetadataRegistry
 

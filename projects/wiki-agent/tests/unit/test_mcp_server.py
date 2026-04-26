@@ -7,7 +7,7 @@ from typing import Any
 
 import llm_patch as engine
 import pytest
-from llm_patch_shared import ConfigurationError
+from llm_patch_utils import ConfigurationError
 
 from llm_patch_wiki_agent import WikiAgentConfig
 from llm_patch_wiki_agent.gateway import GatewayContext

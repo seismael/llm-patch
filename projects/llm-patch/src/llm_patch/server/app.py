@@ -11,7 +11,7 @@ from typing import cast
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
-from llm_patch_shared import (
+from llm_patch_utils import (
     AdapterNotFoundError,
     ChecksumMismatchError,
     IncompatibleBaseModelError,

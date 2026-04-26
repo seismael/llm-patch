@@ -12,7 +12,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
-from llm_patch_shared import ConfigurationError
+from llm_patch_utils import ConfigurationError
 
 try:
     import torch

@@ -62,7 +62,7 @@ def configure_hub(
 
 
 def _require_registry() -> object:
-    from llm_patch_shared import RegistryUnavailableError
+    from llm_patch_utils import RegistryUnavailableError
 
     if _registry is None:
         raise RegistryUnavailableError(
@@ -73,7 +73,7 @@ def _require_registry() -> object:
 
 
 def _require_controller() -> object:
-    from llm_patch_shared import RegistryUnavailableError
+    from llm_patch_utils import RegistryUnavailableError
 
     if _controller is None:
         raise RegistryUnavailableError(

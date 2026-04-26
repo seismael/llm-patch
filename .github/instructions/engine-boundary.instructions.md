@@ -1,6 +1,6 @@
 ---
 applyTo: "projects/llm-patch/**"
-description: "Engine boundary rules: no imports from use-cases; preserve public API; preserve test baseline 216 passed / 3 skipped."
+description: "Engine boundary rules: no imports from use-cases; preserve public API; preserve test baseline 464 passed / 12 skipped."
 ---
 
 # Engine Boundary Rules
@@ -14,15 +14,16 @@ implement the engine layer of the architecture in
 
 - **Do not import** from `llm_patch_wiki_agent` or any other use-case
   package. Dependency direction is one-way (use-cases → engine).
-- **Do not import** from `llm_patch_shared` until that dependency is
-  explicitly added via ADR. Today the engine has no shared-utils dep.
+- **May import** from `llm_patch_utils` for shared error types only
+  (per [ADR-0005](../../docs/adr/0005-engine-shared-errors.md)). Any
+  broader engine usage of utils helpers requires a new ADR.
 - **Do not edit** existing ABCs in `core/interfaces.py` to add a new
   capability. Add a new ABC or a new Strategy implementation instead
   (Open/Closed).
 - **Preserve the public API**: anything currently re-exported from
   `src/llm_patch/__init__.py` stays re-exported (additions OK, removals
   require a major bump + ADR + deprecation).
-- **Preserve the test baseline**: `216 passed, 3 skipped`. Any PR that
+- **Preserve the test baseline**: `464 passed, 12 skipped`. Any PR that
   changes the count must justify the change in its description.
 
 ## When Adding a New Source / Generator / Storage / Provider / Runtime

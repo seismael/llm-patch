@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import llm_patch as engine
-from llm_patch_shared import ConfigurationError, LlmPatchError, ResourceNotFoundError
+from llm_patch_utils import ConfigurationError, LlmPatchError, ResourceNotFoundError
 
 from llm_patch_wiki_agent import __version__
 from llm_patch_wiki_agent.gateway.schemas import (

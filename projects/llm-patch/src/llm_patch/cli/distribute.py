@@ -25,7 +25,7 @@ from typing import Final
 
 import click
 
-from llm_patch_shared import RegistryUnavailableError
+from llm_patch_utils import RegistryUnavailableError
 
 CANONICAL_REGISTRY_ENV: Final = "LLM_PATCH_PLUGIN_REGISTRY"
 LEGACY_REGISTRY_ENV: Final = "LLM_PATCH_REGISTRY"

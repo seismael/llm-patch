@@ -21,7 +21,7 @@ from pathlib import Path
 from typing import Any, Protocol
 
 import llm_patch as engine
-from llm_patch_shared import ConfigurationError, IntegrationError
+from llm_patch_utils import ConfigurationError, IntegrationError
 
 from llm_patch_wiki_agent.agent import WikiAgentConfig
 from llm_patch_wiki_agent.registry import AdapterMetadata, SidecarMetadataRegistry

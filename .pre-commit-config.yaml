@@ -23,12 +23,12 @@ repos:
         language: system
         pass_filenames: false
         files: '^projects/llm-patch/.+\.py$'
-      - id: mypy-shared-utils
-        name: mypy-shared-utils
-        entry: uv run --package llm-patch-shared mypy --config-file projects/shared-utils/pyproject.toml projects/shared-utils/src projects/shared-utils/tests
+      - id: mypy-utils
+        name: mypy-utils
+        entry: uv run --package llm-patch-utils mypy --config-file projects/utils/pyproject.toml projects/utils/src projects/utils/tests
         language: system
         pass_filenames: false
-        files: '^projects/shared-utils/.+\.py$'
+        files: '^projects/utils/.+\.py$'
       - id: mypy-wiki-agent
         name: mypy-wiki-agent
         entry: uv run --package llm-patch-wiki-agent mypy --config-file projects/wiki-agent/pyproject.toml projects/wiki-agent/src projects/wiki-agent/tests

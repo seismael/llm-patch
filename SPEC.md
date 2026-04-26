@@ -30,8 +30,8 @@ The repository is partitioned into three layers. Dependencies flow
                 └─────────────────┬───────────────────────────┘
                                   │
                 ┌─────────────────▼───────────────────────────┐
-   Layer 1      │  Shared utilities (llm-patch-shared)        │
-   Shared       │  → may depend on: stdlib only               │
+   Layer 1      │  Shared utilities (llm-patch-utils)         │
+   Utils        │  → may depend on: stdlib only               │
                 └─────────────────────────────────────────────┘
 ```
 
@@ -41,12 +41,32 @@ The repository is partitioned into three layers. Dependencies flow
   layer N+k (k > 0).
 - **R-1.2** A use-case must consume the engine **only** through the
   public symbols re-exported from `llm_patch.__init__`.
-- **R-1.3** Adding a runtime dependency to `llm-patch-shared` requires
+- **R-1.3** Adding a runtime dependency to `llm-patch-utils` requires
   an ADR.
 - **R-1.4** Cross-cutting concerns (logging, telemetry, common errors)
-  belong in `llm-patch-shared`, not the engine.
+  belong in `llm-patch-utils`, not the engine.
 
 Enforced by [tools/check_layering.py](tools/check_layering.py) (pre-commit + CI).
+
+### 1.1 Project Shape (unified template)
+
+Every project under `projects/<name>/` follows the same flat layout:
+
+```
+projects/<name>/
+  pyproject.toml      # name = "llm-patch[-<usecase>]"
+  README.md
+  CHANGELOG.md
+  src/<import_pkg>/   # llm_patch[_<usecase>] by convention
+  tests/
+```
+
+**No per-project `AGENTS.md`.** The single root [AGENTS.md](AGENTS.md)
+is the only human-facing agent contract; scoped, machine-loaded rules
+live in `.github/instructions/*.instructions.md` and are applied by VS
+Code via `applyTo` globs. New projects must be created with
+[tools/scaffold_project.py](tools/scaffold_project.py) which enforces
+this shape (see ADR-0009).
 
 ---
 
@@ -164,27 +184,33 @@ the same exemption.
 
 ## 8. Naming Conventions
 
-- **Packages**: `llm_patch`, `llm_patch_shared`, `llm_patch_<usecase>`.
-  Project (distribution) names use hyphens; Python import names use
+- **Packages**: `llm_patch`, `llm_patch_utils`, `llm_patch_<usecase>`.
+  Project (distribution) names use hyphens (`llm-patch`,
+  `llm-patch-utils`, `llm-patch-<usecase>`); Python import names use
   underscores.
 - **Interfaces (ABCs)**: prefix `I` (e.g., `IDataSource`).
   Implementations: descriptive concrete name (e.g., `MarkdownDataSource`).
 - **Configs**: Pydantic `BaseModel` or frozen dataclass; named
   `XxxConfig` or `XxxSpec`.
-- **Errors**: derive from `llm_patch_shared.errors.LlmPatchError`.
+- **Errors**: derive from `llm_patch_utils.errors.LlmPatchError`.
 
 ---
 
 ## 9. Adding a New Use-Case Project
 
 1. Run `python tools/scaffold_project.py <name>` to materialize the
-   standardized skeleton (`src/`, `tests/{unit,integration}/`, `docs/`,
-   `data/`, `artifacts/`, `examples/`, `pyproject.toml`, `AGENTS.md`,
-   `README.md`, `CHANGELOG.md`).
+   standardized skeleton (`src/llm_patch_<name>/`, `tests/`,
+   `pyproject.toml`, `README.md`, `CHANGELOG.md`). The scaffold
+   enforces §1.1 Project Shape and does **not** create a per-project
+   `AGENTS.md` (rules live in the root [AGENTS.md](AGENTS.md) and in
+   `.github/instructions/*.instructions.md`).
 2. Add `<name>` as a member of the workspace (already covered by
    `members = ["projects/*"]`).
-3. Write its `AGENTS.md` (allowed deps, public API surface, do/don't).
-4. Open an ADR if the new use-case adds a new external dependency or
+3. Depend on `llm-patch` (the engine's public API) and optionally
+   `llm-patch-utils`. Never import engine internals.
+4. Use [projects/wiki-agent/](projects/wiki-agent/) as the reference
+   implementation.
+5. Open an ADR if the new use-case adds a new external dependency or
    touches a layering rule.
 
 ---
@@ -192,8 +218,10 @@ the same exemption.
 ## 10. Glossary
 
 - **Engine**: `projects/llm-patch/` — the generic framework.
-- **Use-case**: any project under `projects/` other than the engine and
-  shared-utils. Built on top of the engine's public API.
+- **Utils**: `projects/utils/` — stdlib-only cross-project helpers
+  (`llm-patch-utils` / `llm_patch_utils`).
+- **Use-case**: any project under `projects/` other than the engine
+  and utils. Built on top of the engine's public API.
 - **Public API**: symbols re-exported from a project's top-level
   `__init__.py`.
 - **ADR**: Architecture Decision Record. See

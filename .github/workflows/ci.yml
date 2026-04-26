@@ -31,8 +31,8 @@ jobs:
       - name: Mypy (engine)
         working-directory: projects/llm-patch
         run: uv run mypy src
-      - name: Mypy (shared-utils)
-        working-directory: projects/shared-utils
+      - name: Mypy (utils)
+        working-directory: projects/utils
         run: uv run mypy src
       - name: Mypy (wiki-agent)
         working-directory: projects/wiki-agent
@@ -47,7 +47,7 @@ jobs:
         python: ["3.11", "3.12"]
         project:
           - llm-patch
-          - llm-patch-shared
+          - llm-patch-utils
           - llm-patch-wiki-agent
     steps:
       - uses: actions/checkout@v4
@@ -63,8 +63,8 @@ jobs:
           if [ "${{ matrix.project }}" = "llm-patch" ]; then
             cd projects/llm-patch
             uv run pytest -q
-          elif [ "${{ matrix.project }}" = "llm-patch-shared" ]; then
-            cd projects/shared-utils
+          elif [ "${{ matrix.project }}" = "llm-patch-utils" ]; then
+            cd projects/utils
             uv run pytest -q
           else
             cd projects/wiki-agent

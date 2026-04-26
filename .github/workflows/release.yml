@@ -5,7 +5,7 @@ on:
   push:
     tags:
       - "llm-patch-v*"
-      - "llm-patch-shared-v*"
+      - "llm-patch-utils-v*"
       - "llm-patch-wiki-agent-v*"
 
 jobs:

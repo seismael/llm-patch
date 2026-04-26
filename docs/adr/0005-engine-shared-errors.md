@@ -1,6 +1,6 @@
-# 0005 — Engine dependency on shared-utils for error types
+# 0005 — Engine dependency on utils for error types
 
-- **Status**: Accepted
+- **Status**: Accepted (distribution renamed `llm-patch-shared` → `llm-patch-utils` by [ADR-0009](0009-monorepo-structural-unification.md); rule unchanged)
 - **Date**: 2026-04-23
 - **Deciders**: llm-patch maintainers
 - **Tags**: architecture | layering | dependency | errors

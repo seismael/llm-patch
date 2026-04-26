@@ -1,6 +1,6 @@
-# 0002 — Three-Layer Architecture (use-cases → engine → shared)
+# 0002 — Three-Layer Architecture (use-cases → engine → utils)
 
-- **Status**: Accepted
+- **Status**: Accepted (Layer 1 renamed `shared-utils` → `utils` / `llm_patch_shared` → `llm_patch_utils` by [ADR-0009](0009-monorepo-structural-unification.md); rule unchanged)
 - **Date**: 2026-04-21
 - **Tags**: architecture, layering, dependency-direction
 

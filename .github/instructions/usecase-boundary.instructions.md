@@ -33,6 +33,6 @@ implement the use-case layer of the architecture in
 ## Allowed Runtime Dependencies
 
 - `llm-patch` (workspace).
-- `llm-patch-shared` (workspace).
+- `llm-patch-utils` (workspace).
 - `click>=8.0`.
 - Anything else requires an ADR.

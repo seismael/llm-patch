@@ -13,7 +13,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from llm_patch_shared import ConfigurationError, ResourceNotFoundError
+from llm_patch_utils import ConfigurationError, ResourceNotFoundError
 from pydantic import BaseModel, Field
 
 _SIDECAR_SUFFIX = ".meta.json"

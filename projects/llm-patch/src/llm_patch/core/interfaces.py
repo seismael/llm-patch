@@ -279,7 +279,7 @@ class IAdapterRegistryClient(abc.ABC):
         """Download adapter weights into the local repository.
 
         Implementations MUST verify ``manifest.checksum_sha256`` and
-        raise :class:`llm_patch_shared.ChecksumMismatchError` on
+        raise :class:`llm_patch_utils.ChecksumMismatchError` on
         mismatch. Returns the verified, locally-stored manifest.
         """
 

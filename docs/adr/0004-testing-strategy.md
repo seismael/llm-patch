@@ -27,7 +27,7 @@ without imposing churn on legacy code that already works.
      `pytest -m integration`.
 4. **Baselines are release blockers**:
    - Engine: `216 passed, 3 skipped`.
-   - shared-utils: smoke tests pass.
+   - shared-utils (now `utils`, see [ADR-0009](0009-monorepo-structural-unification.md)): smoke tests pass.
    - wiki-agent: smoke tests pass.
 
 ## Consequences

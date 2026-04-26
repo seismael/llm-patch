@@ -60,7 +60,7 @@ class _InMemoryRegistry(IAdapterRegistryClient):
             blob = self.blobs[self._key(ref)]
             actual = hashlib.sha256(blob).hexdigest()
             if actual != manifest.checksum_sha256:
-                from llm_patch_shared import ChecksumMismatchError
+                from llm_patch_utils import ChecksumMismatchError
 
                 raise ChecksumMismatchError(
                     f"checksum mismatch: expected {manifest.checksum_sha256}, got {actual}"
@@ -151,7 +151,7 @@ class TestManifestV2Roundtrip:
     def test_pull_raises_on_checksum_mismatch(
         self, manifest: AdapterManifest
     ) -> None:
-        from llm_patch_shared import ChecksumMismatchError
+        from llm_patch_utils import ChecksumMismatchError
 
         registry = _InMemoryRegistry()
         ref = AdapterRef.parse("hub://acme/react-19:1.0.0")

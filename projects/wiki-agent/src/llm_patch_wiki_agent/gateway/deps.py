@@ -20,7 +20,7 @@ from dataclasses import dataclass
 from typing import Protocol
 
 import llm_patch as engine
-from llm_patch_shared import ConfigurationError, ResourceNotFoundError
+from llm_patch_utils import ConfigurationError, ResourceNotFoundError
 
 from llm_patch_wiki_agent.agent import WikiAgentConfig
 from llm_patch_wiki_agent.registry import SidecarMetadataRegistry

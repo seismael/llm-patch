@@ -1,6 +1,6 @@
 # 0001 — Adopt a uv Workspace Monorepo
 
-- **Status**: Accepted
+- **Status**: Accepted (§ superseded in part by [ADR-0009](0009-monorepo-structural-unification.md): `shared-utils` → `utils`, `llm_patch_shared` → `llm_patch_utils`)
 - **Date**: 2026-04-21
 - **Tags**: architecture, packaging, tooling
 

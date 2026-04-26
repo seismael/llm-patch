@@ -109,7 +109,7 @@ All error responses use:
 { "error": "<ErrorClassName>", "message": "<human-readable>", "details": {...} }
 ```
 
-Stable error names mapped from `llm_patch_shared.errors`:
+Stable error names mapped from `llm_patch_utils.errors`:
 
 | HTTP | Error name | Meaning |
 |---|---|---|

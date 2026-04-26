@@ -1,9 +1,9 @@
-"""Smoke tests for ``llm_patch_shared`` package metadata and exports."""
+"""Smoke tests for ``llm_patch_utils`` package metadata and exports."""
 
 from __future__ import annotations
 
-import llm_patch_shared
-from llm_patch_shared import (
+import llm_patch_utils
+from llm_patch_utils import (
     ConfigurationError,
     DependencyError,
     IntegrationError,
@@ -13,8 +13,8 @@ from llm_patch_shared import (
 
 
 def test_version_exposed() -> None:
-    assert isinstance(llm_patch_shared.__version__, str)
-    assert llm_patch_shared.__version__.count(".") >= 2
+    assert isinstance(llm_patch_utils.__version__, str)
+    assert llm_patch_utils.__version__.count(".") >= 2
 
 
 def test_error_hierarchy() -> None:

@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 
 from llm_patch import AdapterManifest, LRUAdapterCache
-from llm_patch_shared import CapacityExceededError
+from llm_patch_utils import CapacityExceededError
 
 
 def _manifest(adapter_id: str) -> AdapterManifest:
