@@ -26,15 +26,10 @@ import argparse
 import hashlib
 import logging
 import re
-import sys
 import textwrap
 import time
 from pathlib import Path
 from typing import Any
-
-_SRC = Path(__file__).resolve().parent.parent / "src"
-if str(_SRC) not in sys.path:
-    sys.path.insert(0, str(_SRC))
 
 from llm_patch.core.config import WatcherConfig
 from llm_patch.core.interfaces import IAdapterRepository, IWeightGenerator

@@ -9,16 +9,16 @@ Usage:
     set ANTHROPIC_API_KEY=sk-ant-api03-...
 
     # Run with Claude (default):
-    python examples/run_wiki_e2e.py
+    python examples/e2e/run_wiki_e2e.py
 
     # Run with mock agent (no API key needed):
-    python examples/run_wiki_e2e.py --mock
+    python examples/e2e/run_wiki_e2e.py --mock
 
     # Run against a custom directory:
-    python examples/run_wiki_e2e.py --base-dir ./my-project
+    python examples/e2e/run_wiki_e2e.py --base-dir ./my-project
 
     # Specify a different Claude model:
-    python examples/run_wiki_e2e.py --model claude-sonnet-4-20250514
+    python examples/e2e/run_wiki_e2e.py --model claude-sonnet-4-20250514
 """
 
 from __future__ import annotations
@@ -29,10 +29,6 @@ import shutil
 import sys
 import time
 from pathlib import Path
-
-_SRC = Path(__file__).resolve().parent.parent / "src"
-if str(_SRC) not in sys.path:
-    sys.path.insert(0, str(_SRC))
 
 from llm_patch.wiki.agents.mock import MockWikiAgent
 from llm_patch.wiki.manager import WikiManager
@@ -110,7 +106,7 @@ def run_pipeline(args: argparse.Namespace) -> bool:
     raw_dir = base_dir / "raw"
 
     # If using the default directory, copy example papers there
-    example_papers = Path(__file__).parent / "raw" / "papers"
+    example_papers = Path(__file__).resolve().parent.parent / "data" / "papers"
     if not raw_dir.exists() and example_papers.exists():
         _section("Copying example papers to raw/")
         shutil.copytree(example_papers, raw_dir / "papers")

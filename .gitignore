@@ -79,6 +79,9 @@ checkpoints/
 # ─────────────────────────────────────────────────────────────
 examples/adapters/
 examples/wiki/
+examples/e2e/adapters/
+examples/e2e/wiki/
+examples/e2e/demo_wiki/
 
 # ─────────────────────────────────────────────────────────────
 #  Script output artifacts

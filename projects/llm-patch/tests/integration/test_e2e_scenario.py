@@ -10,10 +10,34 @@ Validates that the full pipeline genuinely works:
 
 from __future__ import annotations
 
+import importlib.util
+import sys
 from pathlib import Path
 from typing import Any
 
 import pytest
+
+# Repo root contains the examples/ directory of demo scripts. Since examples/
+# is intentionally not a Python package (no __init__.py), load the demo module
+# by file path via importlib so the integration test stays decoupled from any
+# packaging assumptions about examples/.
+_REPO_ROOT = Path(__file__).resolve().parents[4]
+_DEMO_PATH = _REPO_ROOT / "examples" / "e2e" / "demo_e2e_scenario.py"
+
+
+def _load_run_scenario() -> Any:
+    """Load run_scenario from examples/e2e/demo_e2e_scenario.py by path."""
+    module_name = "_llm_patch_demo_e2e_scenario"
+    cached = sys.modules.get(module_name)
+    if cached is not None:
+        return cached.run_scenario
+    spec = importlib.util.spec_from_file_location(module_name, _DEMO_PATH)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"Could not load demo module from {_DEMO_PATH}")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[module_name] = module
+    spec.loader.exec_module(module)
+    return module.run_scenario
 
 
 @pytest.fixture()
@@ -28,9 +52,7 @@ class TestEndToEndScenario:
     """Full scenario validation."""
 
     def _run(self, wiki_dir: Path) -> dict[str, Any]:
-        # Import here so conftest.py platform workaround runs first
-        from examples.demo_e2e_scenario import run_scenario
-
+        run_scenario = _load_run_scenario()
         return run_scenario(wiki_dir)
 
     def test_scenario_completes(self, scenario_wiki: Path) -> None:

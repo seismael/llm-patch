@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Tidied `examples/` directory** for a clearer separation between
+  runnable demos and sample data:
+  - `examples/raw/papers/` → `examples/data/papers/` (sample paper corpus).
+  - `examples/demo_wiki/` → `examples/data/wiki/` (pre-built wiki snapshot).
+  - All e2e demo scripts (`run_e2e.py`, `run_wiki_e2e.py`,
+    `demo_e2e_scenario.py`, `research_pipeline.py`, `validate_adapter.py`)
+    moved under `examples/e2e/`.
+  - Removed `examples/__init__.py` so `examples/` is no longer treated
+    as an importable Python package; the integration test
+    `tests/integration/test_e2e_scenario.py` now loads
+    `demo_e2e_scenario` by file path via `importlib`.
+  - `examples/wiki_schema.md` moved to `docs/wiki_schema.md`.
+  - All cross-references (root `README.md`, `examples/README.md`,
+    `docs/USAGE.md`, `docs/wiki_schema.md`,
+    `scripts/run_gemini_comparison.py`, root `pyproject.toml` ruff
+    `per-file-ignores`, and `.gitignore`) updated accordingly.
+
+### Added
+
+- **SPEC §9.1 — Use-case extraction heuristic.** Documents when a
+  feature warrants its own `projects/<name>/` (≥ 2 of: external runtime
+  dependencies, domain-specific schema, long-running surface,
+  standalone publishability) vs. living in `examples/`, `scripts/`,
+  `projects/utils/`, or the engine's own CLI.
+
 ## [1.0.0rc1] — 2026-04-26
 
 First production-readiness release candidate. Public API surface and

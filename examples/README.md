@@ -7,49 +7,55 @@ adapter weights that can be applied to a base language model.
 ## Architecture
 
 ```
-raw/papers/*.md ──► LLM Wiki Agent ──► wiki/ (structured markdown)
-                      (ingest)          │
-                                        ▼
-                                  llm-patch library
-                                  ┌──────────────┐
-                                  │ WikiSource   │ (IKnowledgeSource)
-                                  │  watches     │
-                                  │  wiki/       │
-                                  └──────┬───────┘
-                                         ▼
-                                  ┌──────────────┐
-                                  │ Weight       │ (IWeightGenerator)
-                                  │ Generator    │
-                                  └──────┬───────┘
-                                         ▼
-                                  ┌──────────────┐
-                                  │ Adapter      │ (IAdapterRepository)
-                                  │ Repository   │
-                                  └──────┬───────┘
-                                         ▼
-                                  adapters/{id}/
+data/papers/*.md ──► LLM Wiki Agent ──► wiki/ (structured markdown)
+                       (ingest)          │
+                                          ▼
+                                    llm-patch library
+                                    ┌──────────────┐
+                                    │ WikiSource   │ (IKnowledgeSource)
+                                    │  watches     │
+                                    │  wiki/       │
+                                    └──────┬───────┘
+                                           ▼
+                                    ┌──────────────┐
+                                    │ Weight       │ (IWeightGenerator)
+                                    │ Generator    │
+                                    └──────┬───────┘
+                                           ▼
+                                    ┌──────────────┐
+                                    │ Adapter      │ (IAdapterRepository)
+                                    │ Repository   │
+                                    └──────┬───────┘
+                                           ▼
+                                    adapters/{id}/
 ```
 
-## Files
+## Layout
 
-| File | Purpose |
-|------|---------|
-| `research_pipeline.py` | Core demo — batch or watch mode pipeline |
-| `run_e2e.py` | Full end-to-end: simulate wiki → generate → validate |
-| `validate_adapter.py` | Load adapter + base model, compare inference |
-| `raw/papers/*.md` | 3 sample ML paper summaries |
+```
+examples/
+├── data/                 # Read-only sample corpora used by the demos
+│   ├── papers/           # 3 sample ML paper summaries (raw input)
+│   └── wiki/             # Pre-built wiki snapshot (sources/ + entities/)
+├── e2e/                  # End-to-end demo scripts
+│   ├── run_e2e.py            # Full pipeline: simulate wiki → generate → validate
+│   ├── run_wiki_e2e.py       # Wiki-agent variant (mock or Anthropic)
+│   ├── demo_e2e_scenario.py  # Scripted 5-step scenario for documentation/tests
+│   ├── research_pipeline.py  # Core batch/watch pipeline implementation
+│   └── validate_adapter.py   # GPU-only adapter validation script
+└── quickstart/           # Smallest possible getting-started example
+```
 
 ## Quick Start
 
 ### 1. Run the end-to-end demo (no GPU needed)
 
 ```bash
-cd examples
-python run_e2e.py --clean
+python examples/e2e/run_e2e.py --clean
 ```
 
 This will:
-1. Copy raw papers from `raw/papers/` into a simulated `wiki/` directory
+1. Copy raw papers from `examples/data/papers/` into a simulated `wiki/` directory
 2. Add wiki-style frontmatter and create entity stub pages
 3. Run the WikiKnowledgeSource → MockWeightGenerator → MockAdapterRepository pipeline
 4. Report all generated adapter manifests
@@ -57,13 +63,15 @@ This will:
 ### 2. Batch mode — process an existing wiki
 
 ```bash
-python research_pipeline.py batch --wiki-dir wiki/ --output-dir adapters/
+python examples/e2e/research_pipeline.py batch \
+    --wiki-dir examples/data/wiki/ --output-dir adapters/
 ```
 
 ### 3. Batch mode with wikilink aggregation
 
 ```bash
-python research_pipeline.py batch --wiki-dir wiki/ --aggregate
+python examples/e2e/research_pipeline.py batch \
+    --wiki-dir examples/data/wiki/ --aggregate
 ```
 
 When `--aggregate` is enabled, each source page follows its `[[wikilinks]]`
@@ -73,7 +81,7 @@ enriched document before weight generation.
 ### 4. Watch mode — live monitoring
 
 ```bash
-python research_pipeline.py watch --wiki-dir wiki/
+python examples/e2e/research_pipeline.py watch --wiki-dir wiki/
 ```
 
 Add or modify wiki pages while the watcher is running. Each change triggers
@@ -82,8 +90,9 @@ automatic adapter generation. Press Ctrl-C to stop.
 ### 5. Validate adapters (GPU required)
 
 ```bash
-python validate_adapter.py --adapter-dir adapters/sources/attention-paper \
-                           --base-model google/gemma-2-2b-it
+python examples/e2e/validate_adapter.py \
+    --adapter-dir adapters/sources/attention-paper \
+    --base-model google/gemma-2-2b-it
 ```
 
 This loads the base model, applies the LoRA adapter, and runs a side-by-side

@@ -68,9 +68,10 @@ ignore = [
 known-first-party = ["llm_patch", "llm_patch_utils", "llm_patch_wiki_agent"]
 
 [tool.ruff.lint.per-file-ignores]
-"examples/demo_e2e_scenario.py" = ["ARG001", "ARG002", "E402"]
-"examples/research_pipeline.py" = ["ARG002", "E402"]
-"examples/run_wiki_e2e.py" = ["E402", "TRY400"]
+"examples/e2e/demo_e2e_scenario.py" = ["ARG001", "ARG002", "E402"]
+"examples/e2e/research_pipeline.py" = ["ARG002", "E402"]
+"examples/e2e/run_e2e.py" = ["E402"]
+"examples/e2e/run_wiki_e2e.py" = ["E402", "TRY400"]
 "scripts/run_gemini_comparison.py" = ["PTH123", "RUF001", "SIM115"]
 
 [tool.ruff.format]

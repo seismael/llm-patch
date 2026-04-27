@@ -119,7 +119,7 @@ python run_e2e.py --clean --aggregate
 
 This will:
 
-1. Copy sample ML papers from `raw/papers/` into a simulated `wiki/` directory
+1. Copy sample ML papers from `examples/data/papers/` into a simulated `wiki/` directory
 2. Add wiki-style frontmatter and create entity stub pages
 3. Run the full pipeline with mock generator and repository
 4. Report all generated adapter manifests
@@ -379,7 +379,7 @@ wiki = WikiPipeline(agent, config)
 wiki.init()
 
 # Ingest a raw source
-result = wiki.ingest(Path("./raw/papers/attention-paper.md"))
+result = wiki.ingest(Path("./examples/data/papers/attention-paper.md"))
 
 # Query the wiki
 answer = wiki.query("How does self-attention work?")

@@ -6,8 +6,9 @@ this script *simulates* the wiki ingestion step by copying raw paper markdown
 files into a wiki-style directory structure with added wiki metadata.
 
 Usage:
-    python run_e2e.py
-    python run_e2e.py --raw-dir raw/papers --wiki-dir wiki --output-dir adapters
+    python examples/e2e/run_e2e.py
+    python examples/e2e/run_e2e.py --raw-dir examples/data/papers \
+        --wiki-dir examples/e2e/wiki --output-dir examples/e2e/adapters
 """
 
 from __future__ import annotations
@@ -19,9 +20,10 @@ import shutil
 import sys
 from pathlib import Path
 
-_SRC = Path(__file__).resolve().parent.parent / "src"
-if str(_SRC) not in sys.path:
-    sys.path.insert(0, str(_SRC))
+# Allow sibling-script imports (research_pipeline lives next to this file).
+_SCRIPT_DIR = Path(__file__).resolve().parent
+if str(_SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(_SCRIPT_DIR))
 
 logger = logging.getLogger(__name__)
 
@@ -105,7 +107,7 @@ def simulate_wiki_ingest(raw_dir: Path, wiki_dir: Path) -> list[Path]:
 
 def run_pipeline(wiki_dir: Path, output_dir: Path, *, aggregate: bool) -> None:
     """Invoke research_pipeline in batch mode."""
-    from examples.research_pipeline import (
+    from research_pipeline import (
         MockAdapterRepository,
         MockWeightGenerator,
     )
@@ -137,7 +139,7 @@ def run_pipeline(wiki_dir: Path, output_dir: Path, *, aggregate: bool) -> None:
 
 def validate_adapters(output_dir: Path) -> None:
     """Quick sanity check — just verify manifests were created."""
-    from examples.research_pipeline import MockAdapterRepository
+    from research_pipeline import MockAdapterRepository
 
     _repo = MockAdapterRepository(output_dir)
     # Since MockAdapterRepository is in-memory, we can only confirm the
@@ -153,10 +155,11 @@ def validate_adapters(output_dir: Path) -> None:
 
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description="End-to-end research pipeline runner.")
+    examples_root = Path(__file__).resolve().parent.parent
     p.add_argument(
         "--raw-dir",
         type=Path,
-        default=Path(__file__).resolve().parent / "raw" / "papers",
+        default=examples_root / "data" / "papers",
         help="Directory containing raw paper markdown files.",
     )
     p.add_argument(

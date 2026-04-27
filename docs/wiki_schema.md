@@ -1,7 +1,7 @@
 # Wiki Schema (CLAUDE.md-style)
 
 This file defines the structure, conventions, and rules for the LLM Wiki.
-Load it with `WikiSchema.from_file("wiki_schema.md")`.
+Load it with `WikiSchema.from_file("docs/wiki_schema.md")`.
 
 ## Directory Layout
 
@@ -26,7 +26,7 @@ type: concept|entity|summary|synthesis|journal
 tags: [tag1, tag2]
 created: YYYY-MM-DD
 updated: YYYY-MM-DD
-sources: [raw/papers/example.md]
+sources: [examples/data/papers/example.md]
 confidence: high|medium|low|uncertain
 ---
 ```

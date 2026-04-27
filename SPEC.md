@@ -198,6 +198,36 @@ the same exemption.
 
 ## 9. Adding a New Use-Case Project
 
+### 9.1 Extraction Heuristic — when does something deserve its own project?
+
+Not every demo, script, or feature warrants a `projects/<name>/`
+directory. Promote a piece of work into its own use-case project when
+**at least two** of the following are true:
+
+1. **External runtime dependencies.** It pulls in third-party packages
+   (e.g. `anthropic`, `obsidian-tools`, a vector DB client) that the
+   engine itself must not depend on.
+2. **Domain-specific schema or vocabulary.** It defines its own
+   data model, frontmatter contract, prompt templates, or wire format
+   that is meaningless to the engine and to other use-cases.
+3. **Long-running surface or service.** It exposes a CLI, daemon,
+   server, or scheduled job intended to be operated as a deployable
+   unit, with its own lifecycle, configuration, and logging concerns.
+4. **Standalone publishability.** It is something an end user would
+   reasonably `pip install <name>` on its own, with its own README,
+   versioning, and changelog.
+
+If only **one** criterion applies, prefer one of these lighter homes:
+
+- **One-off scripts** that exercise the engine end-to-end belong in
+  `examples/` (tutorial demos) or `scripts/` (operator/automation
+  one-shots).
+- **Reusable stdlib-only helpers** belong in `projects/utils/`.
+- **Engine-facing CLI commands** belong in the engine itself
+  (`llm_patch.cli`), not in a separate project.
+
+### 9.2 Procedure
+
 1. Run `python tools/scaffold_project.py <name>` to materialize the
    standardized skeleton (`src/llm_patch_<name>/`, `tests/`,
    `pyproject.toml`, `README.md`, `CHANGELOG.md`). The scaffold

@@ -14,14 +14,8 @@ from __future__ import annotations
 
 import argparse
 import logging
-import sys
 from pathlib import Path
 from typing import Any
-
-# Ensure the src directory is importable when running as a script.
-_SRC = Path(__file__).resolve().parent.parent / "src"
-if str(_SRC) not in sys.path:
-    sys.path.insert(0, str(_SRC))
 
 from llm_patch.core.config import StorageConfig, WatcherConfig
 from llm_patch.core.interfaces import IAdapterRepository, IWeightGenerator

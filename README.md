@@ -592,7 +592,7 @@ from llm_patch.core.interfaces import (
 The `examples/` directory contains a complete tutorial that chains an [LLM Wiki Agent](https://github.com/SamurAIGPT/llm-wiki-agent) with llm-patch to build domain-specialized LoRA adapters from ML research papers:
 
 ```
-raw/papers/*.md ──► LLM Wiki Agent ──► wiki/ ──► WikiKnowledgeSource ──► adapters/
+examples/data/papers/*.md ──► LLM Wiki Agent ──► wiki/ ──► WikiKnowledgeSource ──► adapters/
 ```
 
 ### Quick Demo (No GPU Required)

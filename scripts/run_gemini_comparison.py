@@ -216,7 +216,7 @@ def build_wiki(wiki_dir: Path, index: WikiIndex) -> int:
                 title=spec["title"],
                 type=spec["type"],
                 tags=spec["tags"],
-                sources=["examples/raw/papers/"],
+                sources=["examples/data/papers/"],
                 confidence=ConfidenceLevel.HIGH,
             ),
             body=spec["body"],
